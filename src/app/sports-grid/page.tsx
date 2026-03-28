@@ -7,15 +7,15 @@ export const metadata: Metadata = {
 };
 
 const ROW_CATEGORIES = [
-  { label: "Played for the Lakers", sport: "NBA" as const },
-  { label: "Super Bowl Champion", sport: "NFL" as const },
-  { label: "UCL Winner", sport: "Soccer" as const },
+  { label: "Played for the Lakers", sport: "NBA" as const,    categoryId: "nba-lakers" },
+  { label: "Super Bowl Champion",   sport: "NFL" as const,    categoryId: "nfl-super-bowl-champ" },
+  { label: "UCL Winner",            sport: "Soccer" as const, categoryId: "soccer-ucl-winner" },
 ];
 
 const COL_CATEGORIES = [
-  { label: "10+ Seasons", sport: "NBA" as const },
-  { label: "Pro Bowl Selection", sport: "NFL" as const },
-  { label: "50+ International Caps", sport: "Soccer" as const },
+  { label: "10+ Seasons",           sport: "NBA" as const,    categoryId: "career-10-plus-seasons" },
+  { label: "Pro Bowl Selection",    sport: "NFL" as const,    categoryId: "nfl-pro-bowl" },
+  { label: "50+ International Caps", sport: "Soccer" as const, categoryId: "soccer-50-plus-caps" },
 ];
 
 export default function SportsGridPage() {

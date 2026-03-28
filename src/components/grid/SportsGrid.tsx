@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { validateGuess } from "@/lib/sports/validators";
 
 interface GridCategory {
   label: string;
   sport: "NBA" | "NFL" | "Soccer";
+  categoryId: string;
 }
 
 interface SportsGridProps {
@@ -18,10 +20,13 @@ const SPORT_COLORS: Record<GridCategory["sport"], string> = {
   Soccer: "text-green-400",
 };
 
+type CellState = { status: "correct"; name: string } | { status: "wrong" } | { status: "idle" };
+
 export default function SportsGrid({ rowCategories, colCategories }: SportsGridProps) {
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
-  const [guesses, setGuesses] = useState<Record<string, string>>({});
+  const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [inputValue, setInputValue] = useState("");
+  const [feedback, setFeedback] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function cellKey(row: number, col: number) {
@@ -30,21 +35,47 @@ export default function SportsGrid({ rowCategories, colCategories }: SportsGridP
 
   function handleCellClick(row: number, col: number) {
     const key = cellKey(row, col);
-    // Don't allow re-clicking a filled cell
-    if (guesses[key]) return;
+    if (cellStates[key]?.status === "correct") return;
     setSelectedCell((prev) => (prev === key ? null : key));
     setInputValue("");
+    setFeedback(null);
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCell || !inputValue.trim()) return;
-    setGuesses((prev) => ({ ...prev, [selectedCell]: inputValue.trim() }));
-    setSelectedCell(null);
-    setInputValue("");
+
+    const [ri, ci] = selectedCell.split("-").map(Number);
+    const result = validateGuess(
+      inputValue.trim(),
+      rowCategories[ri].categoryId,
+      colCategories[ci].categoryId
+    );
+
+    if (result.status === "correct") {
+      setCellStates((prev) => ({
+        ...prev,
+        [selectedCell]: { status: "correct", name: result.player.name },
+      }));
+      setSelectedCell(null);
+      setInputValue("");
+      setFeedback(null);
+    } else if (result.status === "wrong") {
+      setCellStates((prev) => ({ ...prev, [selectedCell]: { status: "wrong" } }));
+      setFeedback(`${result.player.name} doesn't satisfy both criteria.`);
+      // Clear wrong highlight after animation
+      setTimeout(() => {
+        setCellStates((prev) => {
+          const next = { ...prev };
+          if (next[selectedCell]?.status === "wrong") delete next[selectedCell];
+          return next;
+        });
+      }, 1200);
+    } else {
+      setFeedback("Player not found. Check the spelling and try again.");
+    }
   }
 
-  // Focus input whenever a cell is selected
   useEffect(() => {
     if (selectedCell) inputRef.current?.focus();
   }, [selectedCell]);
@@ -89,24 +120,28 @@ export default function SportsGrid({ rowCategories, colCategories }: SportsGridP
             {colCategories.map((_, ci) => {
               const key = cellKey(ri, ci);
               const isSelected = selectedCell === key;
-              const guess = guesses[key];
+              const state = cellStates[key];
+              const isCorrect = state?.status === "correct";
+              const isWrong = state?.status === "wrong";
 
               return (
                 <button
                   key={key}
                   onClick={() => handleCellClick(ri, ci)}
-                  disabled={!!guess}
+                  disabled={isCorrect}
                   className={[
                     "flex items-center justify-center rounded-xl min-h-[96px] transition-all duration-150 px-2",
-                    "border-2 font-bold text-sm text-center leading-tight",
-                    guess
+                    "border-2 text-sm text-center leading-tight font-semibold",
+                    isCorrect
                       ? "border-green-500 bg-green-500/20 text-green-300 cursor-default"
-                      : isSelected
-                        ? "border-yellow-400 bg-yellow-400/10 text-yellow-300 scale-[1.03]"
-                        : "border-zinc-700 bg-zinc-900 text-zinc-600 hover:border-zinc-500 hover:bg-zinc-800",
+                      : isWrong
+                        ? "border-red-500 bg-red-500/20 text-red-400"
+                        : isSelected
+                          ? "border-yellow-400 bg-yellow-400/10 text-yellow-300 scale-[1.03]"
+                          : "border-zinc-700 bg-zinc-900 text-zinc-600 hover:border-zinc-500 hover:bg-zinc-800",
                   ].join(" ")}
                 >
-                  {guess ?? (isSelected ? "…" : "")}
+                  {isCorrect && state.status === "correct" ? state.name : isSelected ? "…" : ""}
                 </button>
               );
             })}
@@ -114,27 +149,29 @@ export default function SportsGrid({ rowCategories, colCategories }: SportsGridP
         ))}
       </div>
 
-      {/* Guess input — shown only when a cell is selected */}
+      {/* Guess input */}
       {selectedCell && (
-        <form
-          onSubmit={handleSubmit}
-          className="mt-4 flex gap-2"
-        >
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a player name…"
-            className="flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors"
-          />
-          <button
-            type="submit"
-            disabled={!inputValue.trim()}
-            className="rounded-xl bg-yellow-400 text-zinc-950 font-bold px-5 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-300 transition-colors"
-          >
-            Submit
-          </button>
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => { setInputValue(e.target.value); setFeedback(null); }}
+              placeholder="Type a player name…"
+              className="flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={!inputValue.trim()}
+              className="rounded-xl bg-yellow-400 text-zinc-950 font-bold px-5 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-300 transition-colors"
+            >
+              Submit
+            </button>
+          </div>
+          {feedback && (
+            <p className="text-sm text-red-400 px-1">{feedback}</p>
+          )}
         </form>
       )}
     </div>
