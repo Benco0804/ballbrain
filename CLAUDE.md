@@ -32,13 +32,12 @@ src/
     economy/                  # Coins/Gems display, store UI
   lib/
     supabase/
-      client.ts               # Browser Supabase client
+      client.ts               # Browser Supabase client (createBrowserClient)
       server.ts               # Server Supabase client (RSC/Route Handlers)
-      middleware.ts            # Auth session refresh
     game/                     # Game logic (grid generation, scoring)
     sports/                   # Sports data utilities
   types/                      # Shared TypeScript types
-middleware.ts                 # Next.js middleware (auth session)
+src/proxy.ts                  # Next.js Proxy (auth session refresh — middleware renamed in v16)
 ```
 
 ## Key Conventions
