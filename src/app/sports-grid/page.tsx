@@ -67,22 +67,13 @@ export default async function SportsGridPage() {
               {formatPuzzleDate(puzzle.puzzle_date)} &middot; Daily Puzzle
             </p>
           </div>
-          <div className="flex gap-3 text-sm font-semibold">
-            <span className="rounded-full bg-yellow-500/10 text-yellow-400 px-3 py-1 border border-yellow-500/30">
-              9 guesses left
-            </span>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="mt-4 h-1.5 w-full rounded-full bg-zinc-800">
-          <div className="h-1.5 rounded-full bg-yellow-400 w-0 transition-all" />
         </div>
       </div>
 
       {/* Grid */}
       <div className="w-full max-w-2xl">
         <SportsGrid
+          puzzleId={puzzle.id}
           rowCategories={rowCategories}
           colCategories={colCategories}
           validPlayers={validPlayers}
