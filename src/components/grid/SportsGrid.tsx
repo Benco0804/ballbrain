@@ -1,17 +1,19 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { validateGuess } from "@/lib/sports/validators";
+import { normalize } from "@/lib/sports/normalize";
 
 interface GridCategory {
   label: string;
   sport: "NBA" | "NFL" | "Soccer";
-  categoryId: string;
+  categoryId?: string;
 }
 
 interface SportsGridProps {
   rowCategories: GridCategory[];
   colCategories: GridCategory[];
+  /** Maps "row-col" cell keys to the list of accepted player names for that cell. */
+  validPlayers: Record<string, string[]>;
 }
 
 const SPORT_COLORS: Record<GridCategory["sport"], string> = {
@@ -22,7 +24,7 @@ const SPORT_COLORS: Record<GridCategory["sport"], string> = {
 
 type CellState = { status: "correct"; name: string } | { status: "wrong" } | { status: "idle" };
 
-export default function SportsGrid({ rowCategories, colCategories }: SportsGridProps) {
+export default function SportsGrid({ rowCategories, colCategories, validPlayers }: SportsGridProps) {
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [inputValue, setInputValue] = useState("");
@@ -45,25 +47,27 @@ export default function SportsGrid({ rowCategories, colCategories }: SportsGridP
     e.preventDefault();
     if (!selectedCell || !inputValue.trim()) return;
 
-    const [ri, ci] = selectedCell.split("-").map(Number);
-    const result = validateGuess(
-      inputValue.trim(),
-      rowCategories[ri].categoryId,
-      colCategories[ci].categoryId
-    );
+    const accepted = validPlayers[selectedCell] ?? [];
 
-    if (result.status === "correct") {
+    if (accepted.length === 0) {
+      setFeedback("No valid answer exists for this combination.");
+      return;
+    }
+
+    const normalizedInput = normalize(inputValue.trim());
+    const match = accepted.find((name) => normalize(name) === normalizedInput);
+
+    if (match) {
       setCellStates((prev) => ({
         ...prev,
-        [selectedCell]: { status: "correct", name: result.player.name },
+        [selectedCell]: { status: "correct", name: match },
       }));
       setSelectedCell(null);
       setInputValue("");
       setFeedback(null);
-    } else if (result.status === "wrong") {
+    } else {
       setCellStates((prev) => ({ ...prev, [selectedCell]: { status: "wrong" } }));
-      setFeedback(`${result.player.name} doesn't satisfy both criteria.`);
-      // Clear wrong highlight after animation
+      setFeedback("That answer doesn't work for this cell. Try again.");
       setTimeout(() => {
         setCellStates((prev) => {
           const next = { ...prev };
@@ -71,8 +75,6 @@ export default function SportsGrid({ rowCategories, colCategories }: SportsGridP
           return next;
         });
       }, 1200);
-    } else {
-      setFeedback("Player not found. Check the spelling and try again.");
     }
   }
 

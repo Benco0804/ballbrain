@@ -1,4 +1,5 @@
 import { PLAYERS, type Player } from "./players";
+import { normalize } from "./normalize";
 
 type CategoryPredicate = (player: Player) => boolean;
 
@@ -16,16 +17,6 @@ const CATEGORY_PREDICATES: Record<string, CategoryPredicate> = {
   "soccer-50-plus-caps":    (p) => (p.internationalCaps ?? 0) >= 50,
 };
 
-/** Strip accents, punctuation, and normalise whitespace for case-insensitive matching. */
-function normalize(name: string): string {
-  return name
-    .trim()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, "")
-    .replace(/\s+/g, " ");
-}
 
 export type ValidationResult =
   | { status: "correct"; player: Player }
