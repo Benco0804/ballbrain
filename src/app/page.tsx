@@ -22,14 +22,11 @@ function GridIcon() {
   );
 }
 
-function BattleIcon() {
+function TriviaIcon() {
   return (
     <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
-      <path
-        d="M22 4L10 22h10l-4 14 18-20H24L28 4H22z"
-        fill="currentColor"
-        opacity="0.9"
-      />
+      <circle cx="20" cy="20" r="17" stroke="currentColor" strokeWidth="2.5" opacity="0.4" />
+      <text x="20" y="27" textAnchor="middle" fontSize="22" fontWeight="bold" fill="currentColor" opacity="0.9">?</text>
     </svg>
   );
 }
@@ -49,15 +46,15 @@ const GAMES = [
     ctaClass: "bg-yellow-400 hover:bg-yellow-300 text-zinc-950",
   },
   {
-    href: "/trivia-battle",
-    icon: <BattleIcon />,
+    href: "/trivia",
+    icon: <TriviaIcon />,
     iconColor: "text-indigo-400",
     accentBorder: "hover:border-indigo-500/50",
-    badge: "Live",
+    badge: "Daily",
     badgeColor: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
-    name: "1v1 Trivia Battle",
+    name: "Solo Trivia",
     description:
-      "Go head-to-head against another fan in real-time trivia. First to 5 correct answers wins bragging rights.",
+      "Millionaire-style sports trivia. 15 questions, 20 seconds each. Climb the ladder and earn up to 500 coins.",
     sports: ["NBA", "NFL", "Soccer"],
     ctaClass: "bg-indigo-500 hover:bg-indigo-400 text-white",
   },
