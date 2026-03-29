@@ -80,6 +80,8 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ puzzleId, score, guessesUsed: totalGuesses, cellsFilled }),
       });
+      // Notify the navbar to refresh the coin balance.
+      window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
     } catch {
       // Silent fail — game result saving is non-critical
     }
