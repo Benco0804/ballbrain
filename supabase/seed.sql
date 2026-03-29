@@ -1,7 +1,7 @@
 -- =============================================================================
 -- BallBrain — Seed Data
 -- =============================================================================
--- Inserts three daily puzzles for 2026-03-28 (NBA, NFL, Soccer).
+-- Inserts three daily puzzles for today / CURRENT_DATE (NBA, NFL, Soccer).
 -- All rows and columns in each puzzle share the same sport so every cell
 -- intersection has at least one real valid player.
 -- Safe to re-run: deletes then re-inserts using explicit IDs.
@@ -15,17 +15,17 @@ DECLARE
 BEGIN
 
   -- Remove any pre-existing data for this date so the seed is idempotent.
-  DELETE FROM public.daily_puzzles WHERE puzzle_date = '2026-03-28';
+  DELETE FROM public.daily_puzzles WHERE puzzle_date = CURRENT_DATE;
 
   -- -------------------------------------------------------------------------
-  -- NBA Puzzle  (2026-03-28)
+  -- NBA Puzzle  (CURRENT_DATE)
   -- Rows:    Lakers | Celtics | Bulls
   -- Columns: NBA Champion | 10+ Seasons | NBA All-Star
   -- -------------------------------------------------------------------------
   INSERT INTO public.daily_puzzles (
     puzzle_date, row_categories, col_categories, sport, difficulty
   ) VALUES (
-    '2026-03-28',
+    CURRENT_DATE,
     '[
       {"label": "Played for the Lakers",  "sport": "NBA", "categoryId": "nba-lakers"},
       {"label": "Played for the Celtics", "sport": "NBA", "categoryId": "nba-celtics"},
@@ -100,14 +100,14 @@ BEGIN
 
 
   -- -------------------------------------------------------------------------
-  -- NFL Puzzle  (2026-03-28)
+  -- NFL Puzzle  (CURRENT_DATE)
   -- Rows:    Patriots | Cowboys | 49ers
   -- Columns: Super Bowl Champion | Pro Bowl Selection | 10+ Seasons
   -- -------------------------------------------------------------------------
   INSERT INTO public.daily_puzzles (
     puzzle_date, row_categories, col_categories, sport, difficulty
   ) VALUES (
-    '2026-03-28',
+    CURRENT_DATE,
     '[
       {"label": "Played for the Patriots", "sport": "NFL", "categoryId": "nfl-patriots"},
       {"label": "Played for the Cowboys",  "sport": "NFL", "categoryId": "nfl-cowboys"},
@@ -183,14 +183,14 @@ BEGIN
 
 
   -- -------------------------------------------------------------------------
-  -- Soccer Puzzle  (2026-03-28)
+  -- Soccer Puzzle  (CURRENT_DATE)
   -- Rows:    Real Madrid | Barcelona | Manchester United
   -- Columns: UCL Winner | 50+ International Caps | Ballon d'Or Winner
   -- -------------------------------------------------------------------------
   INSERT INTO public.daily_puzzles (
     puzzle_date, row_categories, col_categories, sport, difficulty
   ) VALUES (
-    '2026-03-28',
+    CURRENT_DATE,
     '[
       {"label": "Played for Real Madrid",       "sport": "Soccer", "categoryId": "soccer-real-madrid"},
       {"label": "Played for Barcelona",          "sport": "Soccer", "categoryId": "soccer-barcelona"},

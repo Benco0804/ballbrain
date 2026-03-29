@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { normalize } from "@/lib/sports/normalize";
+import { ECONOMY } from "@/lib/economy/constants";
+import ResultModal from "./ResultModal";
 
 interface GridCategory {
   label: string;
@@ -35,6 +37,8 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
   const [feedback, setFeedback] = useState<string | null>(null);
   const [guessesUsed, setGuessesUsed] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+  const [coinsEarned, setCoinsEarned] = useState(0);
+  const [showModal, setShowModal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function cellKey(row: number, col: number) {
@@ -59,6 +63,16 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
     for (const [key, state] of Object.entries(states)) {
       if (state.status === "correct") cellsFilled[key] = state.name;
     }
+
+    // Calculate coins locally for immediate display — server validates and persists.
+    const isPerfect = score === 9;
+    const earned =
+      score * ECONOMY.SPORTS_GRID.COINS_PER_CORRECT_CELL +
+      (isPerfect ? ECONOMY.SPORTS_GRID.PERFECT_BONUS : ECONOMY.SPORTS_GRID.PARTICIPATION);
+    setCoinsEarned(earned);
+
+    // Show modal after a brief pause so the player sees their final board.
+    setTimeout(() => setShowModal(true), 700);
 
     try {
       await fetch("/api/game-results", {
@@ -223,42 +237,43 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
         ))}
       </div>
 
-      {/* Game over panel */}
-      {gameOver ? (
-        <div className="mt-6 rounded-2xl bg-zinc-800 border border-zinc-700 px-6 py-5 text-center">
-          <p className="text-lg font-bold text-white">
-            {correctCount === TOTAL_CELLS ? "Puzzle Complete!" : "Game Over"}
-          </p>
-          <p className="mt-1 text-zinc-400 text-sm">
-            {correctCount} / {TOTAL_CELLS} cells correct &middot; {guessesUsed} guess{guessesUsed !== 1 ? "es" : ""} used
-          </p>
-        </div>
-      ) : (
-        /* Guess input */
-        selectedCell && (
-          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
-            <div className="flex gap-2">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => { setInputValue(e.target.value); setFeedback(null); }}
-                placeholder="Type a player name…"
-                className="flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors"
-              />
-              <button
-                type="submit"
-                disabled={!inputValue.trim()}
-                className="rounded-xl bg-yellow-400 text-zinc-950 font-bold px-5 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-300 transition-colors"
-              >
-                Submit
-              </button>
-            </div>
-            {feedback && (
-              <p className="text-sm text-red-400 px-1">{feedback}</p>
-            )}
-          </form>
-        )
+      {/* Guess input — hidden once game ends */}
+      {!gameOver && selectedCell && (
+        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputValue}
+              onChange={(e) => { setInputValue(e.target.value); setFeedback(null); }}
+              placeholder="Type a player name…"
+              className="flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors"
+            />
+            <button
+              type="submit"
+              disabled={!inputValue.trim()}
+              className="rounded-xl bg-yellow-400 text-zinc-950 font-bold px-5 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-300 transition-colors"
+            >
+              Submit
+            </button>
+          </div>
+          {feedback && (
+            <p className="text-sm text-red-400 px-1">{feedback}</p>
+          )}
+        </form>
+      )}
+
+      {/* Result modal — shown 700ms after game ends */}
+      {showModal && (
+        <ResultModal
+          won={correctCount === TOTAL_CELLS}
+          correctCount={correctCount}
+          coinsEarned={coinsEarned}
+          cellStates={cellStates}
+          validPlayers={validPlayers}
+          rowCategories={rowCategories}
+          colCategories={colCategories}
+        />
       )}
     </div>
   );

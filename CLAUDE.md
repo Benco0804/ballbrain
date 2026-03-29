@@ -2,7 +2,13 @@
 
 # BallBrain
 
-Sports trivia gaming platform for fans ages 18–50. Two launch games: **Sports Grid** (daily tic-tac-toe/trivia hybrid) and **1v1 Trivia Battle**. Sports covered: NBA, NFL, Soccer. Virtual economy: **Coins** (earned in-game) and **Gems** (premium currency).
+Sports trivia gaming platform for fans ages 18–50. Three game modes:
+
+1. **Sports Grid** — daily tic-tac-toe/trivia hybrid. Status: **alpha, live**.
+2. **Solo Trivia** — Millionaire-style single-player trivia. Status: **alpha, to build**.
+3. **1v1 Trivia Battle** — real-time head-to-head trivia. Status: **beta, post-alpha** (build once player base exists).
+
+Sports covered: NBA, NFL, Soccer. Virtual economy: **Coins** (earned in-game) and **Gems** (premium currency).
 
 ## Tech Stack
 
@@ -66,10 +72,74 @@ src/proxy.ts                  # Next.js Proxy (auth session refresh — middlewa
 - **Coins**: earned by playing, used for basic unlocks. Never purchased directly.
 - **Gems**: premium currency. All gem grants/deductions must go through a server-side Route Handler — never trust client-reported balances.
 - Economy mutations must be idempotent (use a transaction ID to prevent double-credits).
+- **All economy values must be imported from `src/lib/economy/constants.ts`** — never hardcode coin/gem amounts in UI components or game logic.
 
 ### Games
 - **Sports Grid**: one puzzle per day, same for all users. Grid state is stored in Supabase; do not store it only in client state.
-- **1v1 Trivia Battle**: real-time matchmaking. Use Supabase Realtime channels for game state sync.
+- **1v1 Trivia Battle**: real-time matchmaking. Use Supabase Realtime channels for game state sync. Not in active development until alpha games have an established player base.
+
+## Economy Specs
+
+### Starting Balance
+- New users receive **100 coins** on account creation.
+
+### Sports Grid Earnings
+| Outcome | Coins |
+|---|---|
+| Correct cell | 10 |
+| Perfect puzzle (all 9 correct) | +60 bonus |
+| Participation (any loss) | 15 |
+
+### Sports Grid Hint System
+- Cost: **50 coins** per hint.
+- Max **3 hints** per puzzle.
+- Each hint reveals one valid player for the selected cell.
+- Hint purchases go through a server-side Route Handler; never deduct client-side.
+
+### Solo Trivia (Millionaire-style)
+- **1 free play per day** per user; tracked server-side.
+- **20-second timer** per question.
+- **4 answer choices** per question.
+- **15 questions** total; coins awarded at milestone questions only:
+
+| Question | Coins Awarded |
+|---|---|
+| Q3 | 20 |
+| Q6 | 50 |
+| Q9 | 100 |
+| Q12 | 200 |
+| Q15 (final) | 500 |
+
+- Milestone coins are awarded when the player answers the milestone question correctly (not on reaching it).
+- If the player quits or times out before a milestone, no coins are awarded for that milestone.
+
+### Economy Constants File
+All values above live in `src/lib/economy/constants.ts`. Example shape:
+
+```ts
+export const ECONOMY = {
+  STARTING_COINS: 100,
+  SPORTS_GRID: {
+    COINS_PER_CORRECT_CELL: 10,
+    PERFECT_BONUS: 60,
+    PARTICIPATION: 15,
+    HINT_COST: 50,
+    MAX_HINTS_PER_PUZZLE: 3,
+  },
+  SOLO_TRIVIA: {
+    FREE_PLAYS_PER_DAY: 1,
+    TIMER_SECONDS: 20,
+    ANSWER_CHOICES: 4,
+    MILESTONES: {
+      3: 20,
+      6: 50,
+      9: 100,
+      12: 200,
+      15: 500,
+    },
+  },
+} as const;
+```
 
 ## Environment Variables
 
