@@ -18,6 +18,7 @@ interface SportsGridProps {
   /** Maps "row-col" cell keys to the list of accepted player names for that cell. */
   validPlayers: Record<string, string[]>;
   isAuthenticated: boolean;
+  nextPuzzleUrl: string | null;
 }
 
 const SPORT_COLORS: Record<GridCategory["sport"], string> = {
@@ -31,7 +32,7 @@ const TOTAL_CELLS = 9;
 
 type CellState = { status: "correct"; name: string } | { status: "wrong" } | { status: "idle" };
 
-export default function SportsGrid({ puzzleId, rowCategories, colCategories, validPlayers, isAuthenticated }: SportsGridProps) {
+export default function SportsGrid({ puzzleId, rowCategories, colCategories, validPlayers, isAuthenticated, nextPuzzleUrl }: SportsGridProps) {
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [inputValue, setInputValue] = useState("");
@@ -349,6 +350,7 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
           validPlayers={validPlayers}
           rowCategories={rowCategories}
           colCategories={colCategories}
+          nextPuzzleUrl={nextPuzzleUrl}
         />
       )}
     </div>

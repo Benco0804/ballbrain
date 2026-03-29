@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { ECONOMY } from "@/lib/economy/constants";
+import MidnightCountdown from "@/components/ui/MidnightCountdown";
 
 interface GridCategory {
   label: string;
@@ -18,6 +19,7 @@ interface ResultModalProps {
   validPlayers: Record<string, string[]>;
   rowCategories: GridCategory[];
   colCategories: GridCategory[];
+  nextPuzzleUrl: string | null;
 }
 
 export default function ResultModal({
@@ -28,6 +30,7 @@ export default function ResultModal({
   validPlayers,
   rowCategories,
   colCategories,
+  nextPuzzleUrl,
 }: ResultModalProps) {
   const router = useRouter();
   const isPerfect = correctCount === 9;
@@ -147,12 +150,17 @@ export default function ResultModal({
             </div>
           )}
 
-          {/* Closing message */}
-          <p className="text-center text-sm text-zinc-400">
-            {won
-              ? "Come back tomorrow for a new puzzle."
-              : "Good effort — come back tomorrow for a fresh puzzle."}
-          </p>
+          {/* Play Again / Countdown */}
+          {nextPuzzleUrl ? (
+            <button
+              onClick={() => router.push(nextPuzzleUrl)}
+              className="w-full rounded-xl bg-yellow-400 text-zinc-950 font-extrabold py-3 text-sm hover:bg-yellow-300 transition-colors"
+            >
+              Play Again →
+            </button>
+          ) : (
+            <MidnightCountdown />
+          )}
 
           <button
             onClick={() => router.push("/")}
