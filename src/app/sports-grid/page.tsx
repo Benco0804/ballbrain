@@ -49,6 +49,7 @@ export default async function SportsGridPage({
   const sport = normalizeSport(typeof sportParam === "string" ? sportParam : undefined);
 
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   const today = new Date().toISOString().split("T")[0];
 
   const { data: puzzle, error } = await supabase
@@ -117,6 +118,7 @@ export default async function SportsGridPage({
             rowCategories={rowCategories}
             colCategories={colCategories}
             validPlayers={validPlayers}
+            isAuthenticated={!!user}
           />
         )}
       </div>

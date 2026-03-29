@@ -17,6 +17,7 @@ interface SportsGridProps {
   colCategories: GridCategory[];
   /** Maps "row-col" cell keys to the list of accepted player names for that cell. */
   validPlayers: Record<string, string[]>;
+  isAuthenticated: boolean;
 }
 
 const SPORT_COLORS: Record<GridCategory["sport"], string> = {
@@ -30,7 +31,7 @@ const TOTAL_CELLS = 9;
 
 type CellState = { status: "correct"; name: string } | { status: "wrong" } | { status: "idle" };
 
-export default function SportsGrid({ puzzleId, rowCategories, colCategories, validPlayers }: SportsGridProps) {
+export default function SportsGrid({ puzzleId, rowCategories, colCategories, validPlayers, isAuthenticated }: SportsGridProps) {
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [inputValue, setInputValue] = useState("");
@@ -39,6 +40,9 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
   const [gameOver, setGameOver] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [hintsUsedCount, setHintsUsedCount] = useState(0);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [hintError, setHintError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function cellKey(row: number, col: number) {
@@ -52,6 +56,48 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
     setSelectedCell((prev) => (prev === key ? null : key));
     setInputValue("");
     setFeedback(null);
+  }
+
+  async function handleHint() {
+    if (!selectedCell || hintLoading || hintsUsedCount >= ECONOMY.SPORTS_GRID.MAX_HINTS_PER_PUZZLE) return;
+    setHintLoading(true);
+    setHintError(null);
+    try {
+      const res = await fetch("/api/hints", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ puzzleId, cellKey: selectedCell }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const messages: Record<string, string> = {
+          insufficient_coins: "Not enough coins.",
+          hint_limit_reached: "No hints remaining.",
+        };
+        setHintError(messages[data.error] ?? "Could not load hint.");
+      } else {
+        // Auto-answer the cell — hint acts as a correct submission.
+        const cell = selectedCell;
+        const newStates = { ...cellStates, [cell]: { status: "correct" as const, name: data.player } };
+        const score = Object.values(newStates).filter((s) => s.status === "correct").length;
+
+        setCellStates(newStates);
+        setSelectedCell(null);
+        setInputValue("");
+        setFeedback(null);
+        setHintsUsedCount((n) => n + 1);
+        window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
+
+        if (score === TOTAL_CELLS) {
+          setGameOver(true);
+          saveResult(score, guessesUsed, newStates);
+        }
+      }
+    } catch {
+      setHintError("Could not load hint.");
+    } finally {
+      setHintLoading(false);
+    }
   }
 
   async function saveResult(
@@ -152,7 +198,14 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
     <div className="select-none">
       {/* Status bar */}
       <div className="mb-4 flex items-center justify-between">
-        <span className="text-sm text-zinc-400">{correctCount} / {TOTAL_CELLS} cells filled</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-zinc-400">{correctCount} / {TOTAL_CELLS} cells filled</span>
+          {hintsUsedCount > 0 && (
+            <span className="text-xs text-zinc-600">
+              {hintsUsedCount}/{ECONOMY.SPORTS_GRID.MAX_HINTS_PER_PUZZLE} hints used
+            </span>
+          )}
+        </div>
         <span className={`rounded-full px-3 py-1 text-sm font-semibold border ${
           guessesLeft <= 2
             ? "bg-red-500/10 text-red-400 border-red-500/30"
@@ -262,6 +315,27 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
           {feedback && (
             <p className="text-sm text-red-400 px-1">{feedback}</p>
           )}
+
+          {/* Hint row */}
+          <div className="flex items-center gap-3 px-1">
+            {!isAuthenticated ? (
+              <a href="/login" className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                Log in to use hints
+              </a>
+            ) : hintsUsedCount >= ECONOMY.SPORTS_GRID.MAX_HINTS_PER_PUZZLE ? (
+              <span className="text-xs text-zinc-600">No hints remaining</span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleHint}
+                disabled={hintLoading}
+                className="text-xs text-zinc-400 hover:text-yellow-400 border border-zinc-700 hover:border-yellow-400/50 rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {hintLoading ? "Revealing…" : `Hint · 🪙 ${ECONOMY.SPORTS_GRID.HINT_COST}`}
+              </button>
+            )}
+            {hintError && <span className="text-xs text-red-400">{hintError}</span>}
+          </div>
         </form>
       )}
 
