@@ -30,7 +30,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
 
   const [phase, setPhase] = useState<Phase>("start");
   const [questionIndex, setQuestionIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(TIMER_SECS);
+  const [timeLeft, setTimeLeft] = useState<number>(TIMER_SECS);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [coinsEarned, setCoinsEarned] = useState(0);
   const [won, setWon] = useState(false);
