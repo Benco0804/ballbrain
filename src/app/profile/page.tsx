@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import AvatarUpload from "@/components/profile/AvatarUpload";
+import UsernameEdit from "@/components/profile/UsernameEdit";
 
 export const metadata: Metadata = {
   title: "Profile — BallBrain",
@@ -13,8 +14,7 @@ function calculateStreak(isoDateStrings: string[]): number {
   const unique = [...new Set(isoDateStrings)].sort((a, b) => b.localeCompare(a));
 
   // Streak is only "active" if the most recent activity was today or yesterday.
-  const todayMs = Date.now();
-  const yesterdayStr = new Date(todayMs - 86400000).toISOString().split("T")[0];
+  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
   if (unique[0] < yesterdayStr) return 0;
 
   let streak = 1;
@@ -51,34 +51,40 @@ export default async function ProfilePage() {
   ] = await Promise.all([
     supabase
       .from("users")
-      .select("username, display_name, coins, gems, avatar_url, created_at")
+      .select("username, display_name, coins, avatar_url, created_at")
       .eq("id", user.id)
       .single(),
 
+    // Only count completed grid games for stats and streak.
     supabase
       .from("game_results")
-      .select("score, created_at")
-      .eq("user_id", user.id),
+      .select("score, completed_at")
+      .eq("user_id", user.id)
+      .not("completed_at", "is", null),
 
+    // Only count completed trivia sessions for stats and streak.
     supabase
       .from("solo_trivia_plays")
       .select("questions_answered, play_date")
-      .eq("user_id", user.id),
+      .eq("user_id", user.id)
+      .not("completed_at", "is", null),
   ]);
 
-  const displayName = profile?.display_name || profile?.username || "Player";
+  const username    = profile?.username ?? "Player";
+  const displayName = profile?.display_name || username;
 
-  // Stats
+  // Grid stats
   const gridTotal = gridResults?.length ?? 0;
   const gridWins  = gridResults?.filter((r) => r.score === 9).length ?? 0;
 
-  const triviaTotal = triviaPlays?.length ?? 0;
-  const triviaWins  = triviaPlays?.filter((p) => p.questions_answered === 15).length ?? 0;
+  // Trivia stats
+  const triviaTotal   = triviaPlays?.length ?? 0;
+  const triviaWins    = triviaPlays?.filter((p) => p.questions_answered === 15).length ?? 0;
   const triviaWinRate = triviaTotal > 0 ? Math.round((triviaWins / triviaTotal) * 100) : null;
 
-  // Streak: combine all days with any game activity
-  const gridDates   = (gridResults ?? []).map((r) => r.created_at.split("T")[0]);
-  const triviaDates = (triviaPlays ?? []).map((p) => p.play_date);
+  // Streak: only days with a completed game (use completed_at date for grid, play_date for trivia)
+  const gridDates   = (gridResults ?? []).map((r) => (r.completed_at as string).split("T")[0]);
+  const triviaDates = (triviaPlays  ?? []).map((p) => p.play_date as string);
   const streak = calculateStreak([...gridDates, ...triviaDates]);
 
   return (
@@ -93,10 +99,10 @@ export default async function ProfilePage() {
               avatarUrl={profile?.avatar_url ?? null}
               displayName={displayName}
             />
-            <div className="min-w-0">
-              <h1 className="text-2xl font-extrabold tracking-tight truncate">{displayName}</h1>
+            <div className="min-w-0 flex-1">
+              <UsernameEdit userId={user.id} initialUsername={username} />
               {profile?.display_name && (
-                <p className="text-sm text-zinc-500 truncate">@{profile.username}</p>
+                <p className="text-sm text-zinc-500 truncate">@{username}</p>
               )}
               <p className="text-sm text-zinc-500 truncate mt-0.5">{user.email}</p>
               {profile?.created_at && (
@@ -109,7 +115,7 @@ export default async function ProfilePage() {
         </div>
 
         {/* Summary stats */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <StatCard
             label="Coins"
             value={`🪙 ${(profile?.coins ?? 0).toLocaleString()}`}
@@ -119,11 +125,6 @@ export default async function ProfilePage() {
             label="Current Streak"
             value={streak > 0 ? `🔥 ${streak}` : "—"}
             valueClass={streak > 0 ? "text-orange-400" : "text-zinc-500"}
-          />
-          <StatCard
-            label="Gems"
-            value={`💎 ${(profile?.gems ?? 0).toLocaleString()}`}
-            valueClass="text-cyan-400"
           />
         </div>
 
