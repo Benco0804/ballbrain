@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  const router = useRouter();
   const supabase = createClient();
 
   const [email, setEmail]       = useState("");
@@ -27,8 +25,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   }
 
   async function handleGuestLogin() {
@@ -43,8 +40,7 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   }
 
   return (
