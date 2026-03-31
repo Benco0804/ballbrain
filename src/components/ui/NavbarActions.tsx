@@ -7,9 +7,11 @@ import { createClient } from "@/lib/supabase/client";
 
 interface NavbarActionsProps {
   coins: number | null;
+  avatarUrl: string | null;
+  username: string | null;
 }
 
-export default function NavbarActions({ coins: initialCoins }: NavbarActionsProps) {
+export default function NavbarActions({ coins: initialCoins, avatarUrl, username }: NavbarActionsProps) {
   const router = useRouter();
   const [coins, setCoins] = useState(initialCoins);
 
@@ -47,11 +49,26 @@ export default function NavbarActions({ coins: initialCoins }: NavbarActionsProp
     );
   }
 
+  const initials = (username ?? "?").slice(0, 2).toUpperCase();
+
   return (
     <div className="flex items-center gap-3">
       <span className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-yellow-400">
         🪙 {coins.toLocaleString()}
       </span>
+      <Link
+        href="/profile"
+        className="w-8 h-8 rounded-full overflow-hidden border border-zinc-700 hover:border-yellow-400 transition-colors flex-shrink-0"
+        title="Profile"
+      >
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full bg-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
+            {initials}
+          </div>
+        )}
+      </Link>
       <button
         onClick={handleLogout}
         className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"

@@ -7,13 +7,18 @@ export default async function Navbar() {
   const { data: { user } } = await supabase.auth.getUser();
 
   let coins: number | null = null;
+  let avatarUrl: string | null = null;
+  let username: string | null = null;
+
   if (user) {
     const { data } = await supabase
       .from("users")
-      .select("coins")
+      .select("coins, avatar_url, username")
       .eq("id", user.id)
       .single();
-    coins = data?.coins ?? 0;
+    coins    = data?.coins     ?? 0;
+    avatarUrl = data?.avatar_url ?? null;
+    username  = data?.username   ?? null;
   }
 
   return (
@@ -25,7 +30,7 @@ export default async function Navbar() {
         >
           BallBrain
         </Link>
-        <NavbarActions coins={coins} />
+        <NavbarActions coins={coins} avatarUrl={avatarUrl} username={username} />
       </div>
     </nav>
   );
