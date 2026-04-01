@@ -3,7 +3,7 @@ import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "BallBrain — Sports Trivia Gaming",
-  description: "Daily sports trivia challenges. Test your knowledge of NBA, NFL, and Soccer.",
+  description: "Daily sports trivia challenges. Test your knowledge of NBA and Soccer.",
 };
 
 function GridIcon() {
@@ -42,7 +42,7 @@ const GAMES = [
     name: "Sports Grid",
     description:
       "Fill a 3×3 grid by naming athletes who satisfy both the row and column criteria. One puzzle per day — no second chances.",
-    sports: ["NBA", "NFL", "Soccer"],
+    sports: ["NBA", "Soccer"],
     ctaClass: "bg-yellow-400 hover:bg-yellow-300 text-zinc-950",
   },
   {
@@ -54,8 +54,8 @@ const GAMES = [
     badgeColor: "bg-indigo-500/10 text-indigo-400 border-indigo-500/30",
     name: "Solo Trivia",
     description:
-      "Millionaire-style sports trivia. 15 questions, 20 seconds each. Climb the ladder and earn up to 500 coins.",
-    sports: ["NBA", "NFL", "Soccer"],
+      "Millionaire-style sports trivia. 10 questions, 20 seconds each. Climb the ladder and earn up to 500 coins.",
+    sports: ["NBA", "Soccer"],
     ctaClass: "bg-indigo-500 hover:bg-indigo-400 text-white",
   },
 ] as const;
@@ -142,7 +142,7 @@ export default function HomePage() {
 
       {/* Footer */}
       <p className="mt-16 text-xs text-zinc-600">
-        NBA · NFL · Soccer &nbsp;·&nbsp; New puzzles daily
+        NBA · Soccer &nbsp;·&nbsp; New puzzles daily
       </p>
     </main>
   );
