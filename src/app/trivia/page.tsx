@@ -4,7 +4,7 @@ import TriviaGame from "@/components/trivia/TriviaGame";
 
 export const metadata: Metadata = {
   title: "Solo Trivia — BallBrain",
-  description: "Millionaire-style sports trivia. 15 questions, 20 seconds each.",
+  description: "Millionaire-style sports trivia. 10 questions, 20 seconds each.",
 };
 
 export default async function TriviaPage() {

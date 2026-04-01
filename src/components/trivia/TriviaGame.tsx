@@ -3,32 +3,66 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ECONOMY } from "@/lib/economy/constants";
-import { QUESTIONS } from "@/lib/trivia/questions";
+import { createClient } from "@/lib/supabase/client";
 
 const MILESTONES = ECONOMY.SOLO_TRIVIA.MILESTONES as Record<number, number>;
 const MILESTONE_QS = new Set(Object.keys(MILESTONES).map(Number));
 const TIMER_SECS = ECONOMY.SOLO_TRIVIA.TIMER_SECONDS;
-const TOTAL_QS = QUESTIONS.length; // 15
+const TOTAL_QS = ECONOMY.SOLO_TRIVIA.TOTAL_QUESTIONS;
 
 const SPORT_COLORS: Record<string, string> = {
   NBA: "text-orange-400",
-  NFL: "text-blue-400",
   Soccer: "text-green-400",
 };
 
 const ANSWER_LABELS = ["A", "B", "C", "D"] as const;
 
+type Sport = "NBA" | "Soccer";
 type Phase = "start" | "playing" | "revealing" | "done";
+
+interface GameQuestion {
+  question: string;
+  sport: string;
+  answers: [string, string, string, string];
+  correctIndex: number;
+}
 
 interface TriviaGameProps {
   isAuthenticated: boolean;
   hasPlayedToday: boolean;
 }
 
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function buildGameQuestion(row: {
+  question: string;
+  sport: string;
+  correct_answer: string;
+  wrong_answers: string[];
+}): GameQuestion {
+  const all = shuffle([row.correct_answer, ...row.wrong_answers]);
+  return {
+    question: row.question,
+    sport: row.sport,
+    answers: all as [string, string, string, string],
+    correctIndex: all.indexOf(row.correct_answer),
+  };
+}
+
 export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGameProps) {
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("start");
+  const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [questions, setQuestions] = useState<GameQuestion[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number>(TIMER_SECS);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -40,7 +74,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
   const handleAnswerRef = useRef<(i: number | null) => void>(() => {});
 
   const questionNumber = questionIndex + 1; // 1-based
-  const currentQuestion = QUESTIONS[questionIndex];
+  const currentQuestion = questions[questionIndex] ?? null;
 
   // --- Timer ---
   useEffect(() => {
@@ -58,7 +92,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
 
   // --- Core answer handler ---
   function handleAnswer(answerIndex: number | null) {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || !currentQuestion) return;
 
     const correct = answerIndex === currentQuestion.correctIndex;
     let newCoins = coinsEarned;
@@ -100,7 +134,31 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
     }
   }
 
-  function startGame() {
+  async function startGame() {
+    if (!selectedSport) return;
+    setLoadingQuestions(true);
+
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("trivia_questions")
+        .select("question, sport, correct_answer, wrong_answers")
+        .eq("sport", selectedSport)
+        .eq("status", "active");
+
+      if (error || !data || data.length === 0) {
+        setLoadingQuestions(false);
+        return;
+      }
+
+      const shuffled = shuffle(data).slice(0, TOTAL_QS).map(buildGameQuestion);
+      setQuestions(shuffled);
+    } catch {
+      setLoadingQuestions(false);
+      return;
+    }
+
+    setLoadingQuestions(false);
     setPhase("playing");
     setQuestionIndex(0);
     setTimeLeft(TIMER_SECS);
@@ -113,7 +171,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
 
   function answerButtonClass(i: number): string {
     const base = "w-full rounded-xl border-2 px-4 py-3.5 text-left text-sm font-semibold transition-colors flex items-center gap-3";
-    if (phase !== "revealing") {
+    if (phase !== "revealing" || !currentQuestion) {
       return `${base} border-zinc-700 bg-zinc-900 text-white hover:border-yellow-400 hover:bg-yellow-400/10 hover:text-yellow-300`;
     }
     const isCorrect = i === currentQuestion.correctIndex;
@@ -131,7 +189,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
         <h1 className="text-4xl font-extrabold tracking-tight mb-2">Who Wants to Be a</h1>
         <h1 className="text-4xl font-extrabold tracking-tight text-yellow-400 mb-4">Sports Millionaire?</h1>
         <p className="text-zinc-400 text-sm mb-8 max-w-xs">
-          15 questions. 20 seconds each. NBA, NFL &amp; Soccer.
+          10 questions. 20 seconds each.
           Earn up to <span className="text-yellow-400 font-semibold">500 coins</span>.
         </p>
 
@@ -141,12 +199,40 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
             <p className="text-zinc-400 text-sm">Come back tomorrow for your next free play.</p>
           </div>
         ) : (
-          <button
-            onClick={startGame}
-            className="rounded-xl bg-yellow-400 text-zinc-950 font-extrabold text-lg px-10 py-4 hover:bg-yellow-300 transition-colors"
-          >
-            Play Free Game
-          </button>
+          <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+            <p className="text-sm font-semibold text-zinc-400">Choose a sport</p>
+            <div className="grid grid-cols-2 gap-3 w-full">
+              <button
+                onClick={() => setSelectedSport("NBA")}
+                className={[
+                  "rounded-xl border-2 py-4 font-bold text-sm transition-colors",
+                  selectedSport === "NBA"
+                    ? "border-orange-400 bg-orange-400/10 text-orange-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-orange-400 hover:text-orange-300",
+                ].join(" ")}
+              >
+                🏀 NBA
+              </button>
+              <button
+                onClick={() => setSelectedSport("Soccer")}
+                className={[
+                  "rounded-xl border-2 py-4 font-bold text-sm transition-colors",
+                  selectedSport === "Soccer"
+                    ? "border-green-400 bg-green-400/10 text-green-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-green-400 hover:text-green-300",
+                ].join(" ")}
+              >
+                ⚽ Soccer
+              </button>
+            </div>
+            <button
+              onClick={startGame}
+              disabled={!selectedSport || loadingQuestions}
+              className="w-full rounded-xl bg-yellow-400 text-zinc-950 font-extrabold text-lg px-10 py-4 hover:bg-yellow-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loadingQuestions ? "Loading…" : "Play Free Game"}
+            </button>
+          </div>
         )}
 
         {!isAuthenticated && (
@@ -168,7 +254,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
               {won ? "Trivia Champion!" : "Game Over"}
             </p>
             <p className="mt-1 text-zinc-400 text-sm">
-              {won ? "You answered all 15 questions!" : `You reached Q${questionNumber} of ${TOTAL_QS}`}
+              {won ? "You answered all 10 questions!" : `You reached Q${questionNumber} of ${TOTAL_QS}`}
             </p>
           </div>
 
@@ -180,7 +266,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
             </div>
 
             {/* Wrong answer reveal */}
-            {!won && selectedIndex !== null && (
+            {!won && currentQuestion && selectedIndex !== null && (
               <div className="rounded-xl bg-zinc-800 border border-zinc-700 px-4 py-3 text-sm">
                 <p className="text-zinc-500 text-xs mb-1">Correct answer</p>
                 <p className="text-green-400 font-semibold">
@@ -188,7 +274,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
                 </p>
               </div>
             )}
-            {!won && selectedIndex === null && (
+            {!won && currentQuestion && selectedIndex === null && (
               <div className="rounded-xl bg-zinc-800 border border-zinc-700 px-4 py-3 text-sm">
                 <p className="text-zinc-500 text-xs mb-1">Time ran out — correct answer was</p>
                 <p className="text-green-400 font-semibold">
@@ -216,6 +302,8 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
   }
 
   // ---- Playing / Revealing ----
+  if (!currentQuestion) return null;
+
   const timerPercent = (timeLeft / TIMER_SECS) * 100;
   const timerColor = timeLeft > 10 ? "bg-yellow-400" : timeLeft > 5 ? "bg-orange-400" : "bg-red-500";
 
@@ -286,7 +374,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
       {/* Question Ladder — desktop only */}
       <div className="hidden md:flex flex-col gap-1 w-36 shrink-0 pt-1">
         {Array.from({ length: TOTAL_QS }, (_, i) => {
-          const qNum = TOTAL_QS - i; // Q15 at top, Q1 at bottom
+          const qNum = TOTAL_QS - i; // Q10 at top, Q1 at bottom
           const isMilestone = MILESTONE_QS.has(qNum);
           const isCurrent = qNum === questionNumber;
           const isPast = qNum < questionNumber;

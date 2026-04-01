@@ -79,7 +79,7 @@ export default async function ProfilePage() {
 
   // Trivia stats
   const triviaTotal   = triviaPlays?.length ?? 0;
-  const triviaWins    = triviaPlays?.filter((p) => p.questions_answered === 15).length ?? 0;
+  const triviaWins    = triviaPlays?.filter((p) => p.questions_answered === 10).length ?? 0;
   const triviaWinRate = triviaTotal > 0 ? Math.round((triviaWins / triviaTotal) * 100) : null;
 
   // Streak: only days with a completed game (use completed_at date for grid, play_date for trivia)

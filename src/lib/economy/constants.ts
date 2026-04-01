@@ -13,12 +13,13 @@ export const ECONOMY = {
     FREE_PLAYS_PER_DAY: 1,
     TIMER_SECONDS: 20,
     ANSWER_CHOICES: 4,
+    TOTAL_QUESTIONS: 10,
     MILESTONES: {
-      3: 20,
-      6: 50,
-      9: 100,
-      12: 200,
-      15: 500,
+      2: 20,
+      4: 50,
+      6: 100,
+      8: 200,
+      10: 500,
     } as Record<number, number>,
   },
 } as const;
