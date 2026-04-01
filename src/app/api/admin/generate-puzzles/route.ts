@@ -44,17 +44,16 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Call the Edge Function ─────────────────────────────────────────────────
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const cronSecret = process.env.CRON_SECRET;
 
-  if (!supabaseUrl || !cronSecret) {
+  if (!cronSecret) {
     return NextResponse.json(
-      { error: "NEXT_PUBLIC_SUPABASE_URL or CRON_SECRET is not configured" },
+      { error: "CRON_SECRET is not configured" },
       { status: 503 },
     );
   }
 
-  const edgeFnUrl = `${supabaseUrl}/functions/v1/generate-daily-puzzles`;
+  const edgeFnUrl = "https://wdkzsnkrdqadoiqbjlqr.supabase.co/functions/v1/generate-daily-puzzles";
 
   let edgeResponse: Response;
   try {
