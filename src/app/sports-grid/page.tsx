@@ -92,43 +92,56 @@ export default async function SportsGridPage({
   const today = new Date().toISOString().split("T")[0];
 
   // ── Daily play limit check ───────────────────────────────────────────────────
+  // Count game_results rows created today for this sport.
+  // We join via puzzle_id → daily_puzzles.sport so we never depend on puzzle_date.
   if (user) {
-    const { data: todayPuzzles } = await supabase
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split("T")[0];
+
+    // Fetch all puzzle IDs for this sport (all dates — we'll gate on created_at below).
+    const { data: sportPuzzles } = await supabase
       .from("daily_puzzles")
       .select("id")
-      .eq("sport", sport)
-      .eq("puzzle_date", today);
+      .eq("sport", sport);
 
-    const puzzleIds = todayPuzzles?.map((p) => p.id) ?? [];
+    const sportPuzzleIds = (sportPuzzles ?? []).map((p) => p.id);
 
-    if (puzzleIds.length > 0) {
+    let playsToday = 0;
+    if (sportPuzzleIds.length > 0) {
       const { count } = await supabase
         .from("game_results")
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
-        .in("puzzle_id", puzzleIds);
+        .in("puzzle_id", sportPuzzleIds)
+        .gte("created_at", `${today}T00:00:00.000Z`)
+        .lt("created_at", `${tomorrowStr}T00:00:00.000Z`);
 
-      if ((count ?? 0) >= MAX_GRID_PLAYS_PER_SPORT) {
-        const sportOption = SPORT_OPTIONS.find((o) => o.sport === sport)!;
-        return (
-          <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4">
-            <div className="flex flex-col items-center text-center max-w-sm w-full gap-4">
-              <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-8 w-full">
-                <p className="text-white font-bold text-lg mb-2">
-                  You&apos;ve maxed out today&apos;s {sport} grids! {sportOption.emoji}
-                </p>
-                <p className="text-zinc-400 text-sm">Come back tomorrow for more.</p>
-              </div>
-              <Link
-                href="/sports-grid"
-                className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
-              >
-                ← Go Back
-              </Link>
+      playsToday = count ?? 0;
+    }
+
+    console.log("[grid-limit] sport=%s user=%s playsToday=%d limit=%d", sport, user.id, playsToday, MAX_GRID_PLAYS_PER_SPORT);
+
+    if (playsToday >= MAX_GRID_PLAYS_PER_SPORT) {
+      const sportOption = SPORT_OPTIONS.find((o) => o.sport === sport)!;
+      return (
+        <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4">
+          <div className="flex flex-col items-center text-center max-w-sm w-full gap-4">
+            <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-8 w-full">
+              <p className="text-white font-bold text-lg mb-2">
+                You&apos;ve maxed out today&apos;s {sport} grids! {sportOption.emoji}
+              </p>
+              <p className="text-zinc-400 text-sm">Come back tomorrow for more.</p>
             </div>
-          </main>
-        );
-      }
+            <Link
+              href="/sports-grid"
+              className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
+            >
+              ← Go Back
+            </Link>
+          </div>
+        </main>
+      );
     }
   }
 
