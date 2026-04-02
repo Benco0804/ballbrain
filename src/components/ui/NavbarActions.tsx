@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import HowToPlayModal from "@/components/ui/HowToPlayModal";
 
 interface NavbarActionsProps {
   coins: number | null;
@@ -14,6 +15,7 @@ interface NavbarActionsProps {
 export default function NavbarActions({ coins: initialCoins, avatarUrl, username }: NavbarActionsProps) {
   const router = useRouter();
   const [coins, setCoins] = useState(initialCoins);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   useEffect(() => {
     async function refreshCoins() {
@@ -40,19 +42,35 @@ export default function NavbarActions({ coins: initialCoins, avatarUrl, username
 
   if (coins === null) {
     return (
-      <Link
-        href="/login"
-        className="rounded-lg bg-yellow-400 px-4 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-yellow-300 transition-colors"
-      >
-        Log in
-      </Link>
+      <>
+        <button
+          onClick={() => setShowHowToPlay(true)}
+          className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"
+        >
+          How to Play? ❓
+        </button>
+        <Link
+          href="/login"
+          className="rounded-lg bg-yellow-400 px-4 py-1.5 text-sm font-semibold text-zinc-950 hover:bg-yellow-300 transition-colors"
+        >
+          Log in
+        </Link>
+        {showHowToPlay && <HowToPlayModal game="both" onClose={() => setShowHowToPlay(false)} />}
+      </>
     );
   }
 
   const initials = (username ?? "?").slice(0, 2).toUpperCase();
 
   return (
+    <>
     <div className="flex items-center gap-3">
+      <button
+        onClick={() => setShowHowToPlay(true)}
+        className="hidden sm:block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"
+      >
+        How to Play? ❓
+      </button>
       <span className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-yellow-400">
         🪙 {coins.toLocaleString()}
       </span>
@@ -76,5 +94,7 @@ export default function NavbarActions({ coins: initialCoins, avatarUrl, username
         Log out
       </button>
     </div>
+    {showHowToPlay && <HowToPlayModal game="both" onClose={() => setShowHowToPlay(false)} />}
+    </>
   );
 }
