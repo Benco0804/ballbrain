@@ -336,9 +336,9 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
   const timerColor = timeLeft > 10 ? "bg-yellow-400" : timeLeft > 5 ? "bg-orange-400" : "bg-red-500";
 
   return (
-    <div className="flex gap-6 items-start">
-      {/* Main content */}
-      <div className="flex-1 min-w-0">
+    <div className="md:grid md:grid-cols-[1fr_9rem] md:gap-6 md:items-start">
+      {/* Main content — on mobile this is plain block flow, no flex wrapper */}
+      <div>
         {/* Progress label */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
@@ -367,12 +367,12 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
           </span>
         </div>
 
-        {/* Question */}
+        {/* Question card */}
         <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-5 py-5 mb-4">
           <p className="text-white font-semibold text-base leading-snug">{currentQuestion.question}</p>
         </div>
 
-        {/* Answer buttons — 2×2 grid */}
+        {/* Answer choices */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {currentQuestion.answers.map((answer, i) => (
             <button
@@ -398,7 +398,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
       </div>
 
       {/* Question Ladder — desktop only */}
-      <div className="hidden md:flex flex-col gap-1 w-36 shrink-0 pt-1">
+      <div className="hidden md:flex flex-col gap-1 pt-1">
         {Array.from({ length: TOTAL_QS }, (_, i) => {
           const qNum = TOTAL_QS - i; // Q10 at top, Q1 at bottom
           const isMilestone = MILESTONE_QS.has(qNum);
