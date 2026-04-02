@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import SportsGrid from "@/components/grid/SportsGrid";
 import GridEmptyState from "@/components/grid/GridEmptyState";
 
-const MAX_GRID_PLAYS_PER_SPORT = 2;
+const MAX_GRID_PLAYS_PER_SPORT = 1;
 
 export const metadata: Metadata = {
   title: "Sports Grid — BallBrain",
