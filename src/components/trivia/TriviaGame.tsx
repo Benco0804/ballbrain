@@ -339,38 +339,36 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
     <div className="flex gap-6 items-start">
       {/* Main content */}
       <div className="flex-1 min-w-0">
-        {/* Question header */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
-              Question {questionNumber} of {TOTAL_QS}
-            </span>
-            <span className={`text-xs font-bold uppercase tracking-wider ${SPORT_COLORS[currentQuestion.sport] ?? "text-zinc-400"}`}>
+        {/* Progress label */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
+            Question {questionNumber} of {TOTAL_QS}
+            <span className={`ml-1.5 ${SPORT_COLORS[currentQuestion.sport] ?? "text-zinc-400"}`}>
               · {currentQuestion.sport}
             </span>
-          </div>
+          </span>
           {MILESTONE_QS.has(questionNumber) && (
             <span className="text-xs font-bold text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded-full px-2.5 py-0.5">
-              🪙 {MILESTONES[questionNumber]} milestone
+              🪙 {MILESTONES[questionNumber]}
             </span>
           )}
         </div>
 
-        {/* Timer bar */}
+        {/* Timer bar + countdown */}
         <div className="mb-1 h-1.5 w-full rounded-full bg-zinc-800">
           <div
-            className={`h-1.5 rounded-full transition-all duration-1000 ${timerColor}`}
+            className={`h-1.5 rounded-full transition-all duration-200 ${timerColor}`}
             style={{ width: `${timerPercent}%` }}
           />
         </div>
-        <div className="flex justify-end mb-5">
+        <div className="flex justify-end mb-3">
           <span className={`text-xs font-semibold tabular-nums ${timeLeft <= 5 ? "text-red-400" : "text-zinc-500"}`}>
             {timeLeft}s
           </span>
         </div>
 
         {/* Question */}
-        <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-5 py-5 mb-5">
+        <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-5 py-5 mb-4">
           <p className="text-white font-semibold text-base leading-snug">{currentQuestion.question}</p>
         </div>
 
@@ -393,7 +391,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
 
         {/* Running coin total */}
         {coinsEarned > 0 && (
-          <p className="mt-4 text-center text-sm text-yellow-400 font-semibold">
+          <p className="mt-3 text-center text-sm text-yellow-400 font-semibold">
             🪙 {coinsEarned} earned so far
           </p>
         )}
