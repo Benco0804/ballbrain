@@ -46,11 +46,11 @@ export default function ResultModal({
               : "bg-zinc-800 border-zinc-700"
           }`}
         >
-          <p className={`text-2xl font-bold ${won ? "text-green-400" : "text-white"}`}>
-            {won ? "Puzzle Complete!" : "Game Over"}
+          <p className={`text-2xl font-bold ${won ? "text-yellow-400" : "text-white"}`}>
+            {won ? "🏆 PERFECT GRID! You're a legend" : "💀 Better luck tomorrow, champ"}
           </p>
           <p className="mt-1 text-zinc-400 text-sm">
-            {correctCount} / 9 cells filled
+            {won ? "🎉 Not bad! Come back tomorrow for more" : `${correctCount} / 9 cells filled`}
           </p>
         </div>
 

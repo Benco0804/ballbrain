@@ -258,7 +258,13 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
               disabled={!selectedSport || loadingQuestions}
               className="w-full rounded-xl bg-yellow-400 text-zinc-950 font-extrabold text-lg px-10 py-4 hover:bg-yellow-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loadingQuestions ? "Loading…" : "Play Free Game"}
+              {loadingQuestions
+                ? "Loading…"
+                : selectedSport === "NBA"
+                  ? "Let's Go! 🏀"
+                  : selectedSport === "Soccer"
+                    ? "Kick Off! ⚽"
+                    : "Let's Go!"}
             </button>
           </div>
         )}
@@ -279,7 +285,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
         <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl overflow-hidden">
           <div className={`px-6 py-5 text-center border-b ${won ? "bg-green-500/10 border-green-500/20" : "bg-zinc-800 border-zinc-700"}`}>
             <p className={`text-2xl font-bold ${won ? "text-green-400" : "text-white"}`}>
-              {won ? "Trivia Champion!" : "Game Over"}
+              {won ? "🧠 You're a genius!" : "Game Over"}
             </p>
             <p className="mt-1 text-zinc-400 text-sm">
               {won ? "You answered all 10 questions!" : `You reached Q${questionNumber} of ${TOTAL_QS}`}
@@ -339,6 +345,13 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
     <div className="md:grid md:grid-cols-[1fr_9rem] md:gap-6 md:items-start">
       {/* Main content — on mobile this is plain block flow, no flex wrapper */}
       <div>
+        {/* Final question banner */}
+        {questionNumber === TOTAL_QS && (
+          <div className="mb-3 rounded-xl bg-yellow-400/10 border border-yellow-400/30 px-4 py-2 text-center text-sm font-bold text-yellow-400">
+            🎯 Final question! Make it count
+          </div>
+        )}
+
         {/* Progress label */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
@@ -389,8 +402,19 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
           ))}
         </div>
 
+        {/* Reveal feedback */}
+        {phase === "revealing" && currentQuestion && (
+          <p className={`mt-4 text-center text-sm font-bold ${selectedIndex === currentQuestion.correctIndex ? "text-green-400" : "text-red-400"}`}>
+            {selectedIndex === currentQuestion.correctIndex
+              ? "✅ Nailed it!"
+              : selectedIndex !== null
+                ? `❌ Ouch! The answer was ${currentQuestion.answers[currentQuestion.correctIndex]}`
+                : null}
+          </p>
+        )}
+
         {/* Running coin total */}
-        {coinsEarned > 0 && (
+        {coinsEarned > 0 && phase !== "revealing" && (
           <p className="mt-3 text-center text-sm text-yellow-400 font-semibold">
             🪙 {coinsEarned} earned so far
           </p>

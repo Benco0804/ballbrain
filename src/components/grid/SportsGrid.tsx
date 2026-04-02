@@ -46,6 +46,9 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [inputValue, setInputValue] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [positiveFeedback, setPositiveFeedback] = useState<string | null>(null);
+  const [justCorrectCell, setJustCorrectCell] = useState<string | null>(null);
+  const [inputShaking, setInputShaking] = useState(false);
   const [guessesUsed, setGuessesUsed] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
@@ -66,6 +69,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     setSelectedCell((prev) => (prev === key ? null : key));
     setInputValue("");
     setFeedback(null);
+    setPositiveFeedback(null);
   }
 
   async function handleHint() {
@@ -146,6 +150,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedCell || !inputValue.trim() || gameOver) return;
+    setPositiveFeedback(null);
 
     const accepted = validPlayers[selectedCell] ?? [];
 
@@ -167,11 +172,12 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
           normalize(state.name) === normalizedInput
       );
       if (duplicate) {
-        setFeedback("Player already used in another cell.");
+        setFeedback("🙄 Already used that one");
         return;
       }
 
-      const newStates = { ...cellStates, [selectedCell]: { status: "correct" as const, name: match } };
+      const cell = selectedCell; // capture before state updates clear it
+      const newStates = { ...cellStates, [cell]: { status: "correct" as const, name: match } };
       const score = Object.values(newStates).filter((s) => s.status === "correct").length;
       const isComplete = score === TOTAL_CELLS || newGuessesUsed >= MAX_GUESSES;
 
@@ -180,6 +186,12 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       setSelectedCell(null);
       setInputValue("");
       setFeedback(null);
+      setJustCorrectCell(cell);
+      setPositiveFeedback("🔥 Got it!");
+      setTimeout(() => {
+        setJustCorrectCell(null);
+        setPositiveFeedback(null);
+      }, 900);
 
       if (isComplete) {
         setGameOver(true);
@@ -189,7 +201,9 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       const newStates = { ...cellStates, [selectedCell]: { status: "wrong" as const } };
       setCellStates(newStates);
       setGuessesUsed(newGuessesUsed);
-      setFeedback("That answer doesn't work for this cell. Try again.");
+      setFeedback("❌ Nope!");
+      setInputShaking(true);
+      setTimeout(() => setInputShaking(false), 400);
 
       const score = Object.values(cellStates).filter((s) => s.status === "correct").length;
       const isComplete = newGuessesUsed >= MAX_GUESSES;
@@ -289,7 +303,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
             ? "bg-red-500/10 text-red-400 border-red-500/30"
             : "bg-yellow-500/10 text-yellow-400 border-yellow-500/30"
         }`}>
-          {guessesLeft} guess{guessesLeft !== 1 ? "es" : ""} left
+          {guessesLeft === 1 ? "😬 Last shot..." : `${guessesLeft} shots 🎯`}
         </span>
       </div>
 
@@ -349,10 +363,12 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
                   onClick={() => handleCellClick(ri, ci)}
                   disabled={isCorrect || gameOver}
                   className={[
-                    "flex items-center justify-center rounded-xl min-h-[96px] transition-all duration-150 px-2",
+                    "flex items-center justify-center rounded-xl min-h-[96px] transition-all duration-300 px-2",
                     "border-2 text-sm text-center leading-tight font-semibold",
                     isCorrect
-                      ? "border-green-500 bg-green-500/20 text-green-300 cursor-default"
+                      ? key === justCorrectCell
+                        ? "border-green-400 bg-green-400/50 text-green-200 scale-[1.05]"
+                        : "border-green-500 bg-green-500/20 text-green-300 cursor-default"
                       : isWrong
                         ? "border-red-500 bg-red-500/20 text-red-400"
                         : isSelected
@@ -370,6 +386,11 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
         ))}
       </div>
 
+      {/* Brief positive feedback — visible after correct answer even when form is hidden */}
+      {positiveFeedback && (
+        <p className="mt-3 text-center text-sm font-bold text-green-400">{positiveFeedback}</p>
+      )}
+
       {/* Guess input — hidden once game ends */}
       {!gameOver && selectedCell && (
         <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
@@ -380,14 +401,14 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
               value={inputValue}
               onChange={(e) => { setInputValue(e.target.value); setFeedback(null); }}
               placeholder="Type a player name…"
-              className="flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors"
+              className={`flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors${inputShaking ? " animate-shake" : ""}`}
             />
             <button
               type="submit"
               disabled={!inputValue.trim()}
               className="rounded-xl bg-yellow-400 text-zinc-950 font-bold px-5 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-300 transition-colors"
             >
-              Submit
+              Lock it in 🔒
             </button>
           </div>
           {feedback && (
