@@ -210,7 +210,10 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   }
 
   useEffect(() => {
-    if (selectedCell) inputRef.current?.focus();
+    if (selectedCell && inputRef.current) {
+      inputRef.current.focus({ preventScroll: true });
+      inputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
   }, [selectedCell]);
 
   const correctCount = Object.values(cellStates).filter((s) => s.status === "correct").length;
