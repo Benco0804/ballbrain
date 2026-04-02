@@ -11,18 +11,8 @@ export default async function TriviaPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  let hasPlayedToday = false;
-
-  if (user) {
-    const today = new Date().toISOString().split("T")[0];
-    const { data } = await supabase
-      .from("solo_trivia_plays")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("play_date", today)
-      .maybeSingle();
-    hasPlayedToday = !!data;
-  }
+  // TODO: re-enable daily play limit before launch
+  const hasPlayedToday = false;
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
