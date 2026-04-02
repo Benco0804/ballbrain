@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import SportsGrid from "@/components/grid/SportsGrid";
 import GridEmptyState from "@/components/grid/GridEmptyState";
 
+const MAX_GRID_PLAYS_PER_SPORT = 2;
+
 export const metadata: Metadata = {
   title: "Sports Grid — BallBrain",
   description: "Daily sports trivia grid. Fill every cell to win.",
@@ -83,6 +85,47 @@ export default async function SportsGridPage({
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   const today = new Date().toISOString().split("T")[0];
+
+  // ── Daily play limit check ───────────────────────────────────────────────────
+  if (user) {
+    const { data: todayPuzzles } = await supabase
+      .from("daily_puzzles")
+      .select("id")
+      .eq("sport", sport)
+      .eq("puzzle_date", today);
+
+    const puzzleIds = todayPuzzles?.map((p) => p.id) ?? [];
+
+    if (puzzleIds.length > 0) {
+      const { count } = await supabase
+        .from("game_results")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .in("puzzle_id", puzzleIds);
+
+      if ((count ?? 0) >= MAX_GRID_PLAYS_PER_SPORT) {
+        const sportOption = SPORT_OPTIONS.find((o) => o.sport === sport)!;
+        return (
+          <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4">
+            <div className="flex flex-col items-center text-center max-w-sm w-full gap-4">
+              <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-8 w-full">
+                <p className="text-white font-bold text-lg mb-2">
+                  You&apos;ve maxed out today&apos;s {sport} grids! {sportOption.emoji}
+                </p>
+                <p className="text-zinc-400 text-sm">Come back tomorrow for more.</p>
+              </div>
+              <Link
+                href="/sports-grid"
+                className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
+              >
+                ← Go Back
+              </Link>
+            </div>
+          </main>
+        );
+      }
+    }
+  }
 
   const { data: puzzle, error } = await supabase
     .from("daily_puzzles")

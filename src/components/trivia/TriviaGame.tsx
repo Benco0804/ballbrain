@@ -41,7 +41,7 @@ interface GameQuestion {
 
 interface TriviaGameProps {
   isAuthenticated: boolean;
-  hasPlayedToday: boolean;
+  playedSportsToday: string[];
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -68,7 +68,7 @@ function buildGameQuestion(row: {
   };
 }
 
-export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGameProps) {
+export default function TriviaGame({ isAuthenticated, playedSportsToday }: TriviaGameProps) {
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("start");
@@ -166,7 +166,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
       await fetch("/api/trivia/record", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionsAnswered, coinsEarned: totalCoins }),
+        body: JSON.stringify({ questionsAnswered, coinsEarned: totalCoins, sport: selectedSport }),
       });
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
     } catch {
@@ -263,10 +263,25 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
           Earn up to <span className="text-yellow-400 font-semibold">500 coins</span>.
         </p>
 
-        {hasPlayedToday ? (
-          <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-6 max-w-sm">
-            <p className="text-white font-bold text-lg mb-1">Already played today</p>
-            <p className="text-zinc-400 text-sm">Come back tomorrow for your next free play.</p>
+        {selectedSport && playedSportsToday.includes(selectedSport) ? (
+          /* Already played this sport today */
+          <div className="flex flex-col items-center gap-4 w-full max-w-xs">
+            <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-6 text-center w-full">
+              <p className="text-white font-bold text-lg mb-2">
+                {selectedSport === "NBA"
+                  ? "You've already conquered today's NBA trivia! 🧠"
+                  : selectedSport === "Soccer"
+                    ? "You've already conquered today's Soccer trivia! ⚽"
+                    : "You've already conquered today's Mix trivia! 🔀"}
+              </p>
+              <p className="text-zinc-400 text-sm">Come back tomorrow for another shot.</p>
+            </div>
+            <button
+              onClick={() => setSelectedSport(null)}
+              className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
+            >
+              ← Go Back
+            </button>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-4 w-full max-w-xs">
