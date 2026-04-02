@@ -13,11 +13,23 @@ const TOTAL_QS = ECONOMY.SOLO_TRIVIA.TOTAL_QUESTIONS;
 const SPORT_COLORS: Record<string, string> = {
   NBA: "text-orange-400",
   Soccer: "text-green-400",
+  Mix: "text-purple-400",
 };
 
 const ANSWER_LABELS = ["A", "B", "C", "D"] as const;
 
-type Sport = "NBA" | "Soccer";
+type Sport = "NBA" | "Soccer" | "Mix";
+type Difficulty = "easy" | "medium" | "hard";
+
+function buildDifficultyProgression(): Difficulty[] {
+  const prog: Difficulty[] = [];
+  for (let i = 0; i < 3; i++) prog.push("easy");
+  for (let i = 0; i < 3; i++) prog.push("medium");
+  for (let i = 0; i < 2; i++) prog.push(Math.random() < 0.5 ? "medium" : "hard");
+  for (let i = 0; i < 2; i++) prog.push("hard");
+  return prog;
+}
+
 type Phase = "start" | "playing" | "revealing" | "done";
 
 interface GameQuestion {
@@ -168,19 +180,49 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
 
     try {
       const supabase = createClient();
-      const { data, error } = await supabase
+      let query = supabase
         .from("trivia_questions")
-        .select("question, sport, correct_answer, wrong_answers")
-        .eq("sport", selectedSport)
+        .select("question, sport, correct_answer, wrong_answers, difficulty")
         .eq("status", "active");
+
+      if (selectedSport !== "Mix") {
+        query = query.eq("sport", selectedSport);
+      }
+
+      const { data, error } = await query;
 
       if (error || !data || data.length === 0) {
         setLoadingQuestions(false);
         return;
       }
 
-      const shuffled = shuffle(data).slice(0, TOTAL_QS).map(buildGameQuestion);
-      setQuestions(shuffled);
+      // Group by difficulty, each bucket already shuffled.
+      const byDiff: Record<Difficulty, typeof data> = {
+        easy:   shuffle(data.filter((q) => q.difficulty === "easy")),
+        medium: shuffle(data.filter((q) => q.difficulty === "medium")),
+        hard:   shuffle(data.filter((q) => q.difficulty === "hard")),
+      };
+      const usedIdx: Record<Difficulty, number> = { easy: 0, medium: 0, hard: 0 };
+
+      const FALLBACK: Record<Difficulty, Difficulty[]> = {
+        easy:   ["easy", "medium", "hard"],
+        medium: ["medium", "easy", "hard"],
+        hard:   ["hard", "medium", "easy"],
+      };
+
+      const selected: typeof data = [];
+      for (const diff of buildDifficultyProgression()) {
+        for (const d of FALLBACK[diff]) {
+          if (usedIdx[d] < byDiff[d].length) {
+            selected.push(byDiff[d][usedIdx[d]]);
+            usedIdx[d]++;
+            break;
+          }
+        }
+        if (selected.length === TOTAL_QS) break;
+      }
+
+      setQuestions(selected.map(buildGameQuestion));
     } catch {
       setLoadingQuestions(false);
       return;
@@ -229,7 +271,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
         ) : (
           <div className="flex flex-col items-center gap-4 w-full max-w-xs">
             <p className="text-sm font-semibold text-zinc-400">Choose a sport</p>
-            <div className="grid grid-cols-2 gap-3 w-full">
+            <div className="grid grid-cols-3 gap-3 w-full">
               <button
                 onClick={() => setSelectedSport("NBA")}
                 className={[
@@ -240,6 +282,17 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
                 ].join(" ")}
               >
                 🏀 NBA
+              </button>
+              <button
+                onClick={() => setSelectedSport("Mix")}
+                className={[
+                  "rounded-xl border-2 py-4 font-bold text-sm transition-colors",
+                  selectedSport === "Mix"
+                    ? "border-purple-400 bg-purple-400/10 text-purple-300"
+                    : "border-zinc-700 bg-zinc-900 text-zinc-300 hover:border-purple-400 hover:text-purple-300",
+                ].join(" ")}
+              >
+                🔀 Mix
               </button>
               <button
                 onClick={() => setSelectedSport("Soccer")}
@@ -264,7 +317,9 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
                   ? "Let's Go! 🏀"
                   : selectedSport === "Soccer"
                     ? "Kick Off! ⚽"
-                    : "Let's Go!"}
+                    : selectedSport === "Mix"
+                      ? "Mix It Up! 🔀"
+                      : "Let's Go!"}
             </button>
           </div>
         )}
@@ -356,9 +411,13 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
         <div className="flex items-center justify-between mb-2">
           <span className="text-xs font-bold uppercase tracking-widest text-zinc-500">
             Question {questionNumber} of {TOTAL_QS}
-            <span className={`ml-1.5 ${SPORT_COLORS[currentQuestion.sport] ?? "text-zinc-400"}`}>
-              · {currentQuestion.sport}
-            </span>
+            {selectedSport === "Mix" ? (
+              <span className="ml-1.5 text-purple-400">· MIX</span>
+            ) : (
+              <span className={`ml-1.5 ${SPORT_COLORS[currentQuestion.sport] ?? "text-zinc-400"}`}>
+                · {currentQuestion.sport}
+              </span>
+            )}
           </span>
           {MILESTONE_QS.has(questionNumber) && (
             <span className="text-xs font-bold text-yellow-400 bg-yellow-400/10 border border-yellow-400/30 rounded-full px-2.5 py-0.5">
