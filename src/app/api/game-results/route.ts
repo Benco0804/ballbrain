@@ -24,8 +24,11 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
+    console.log("[game-results] unauthenticated — skipping save");
     return NextResponse.json({ saved: false, reason: "unauthenticated", coinsEarned: 0 });
   }
+
+  console.log("[game-results] user=%s puzzle=%s completed=%s score=%d", user.id, puzzleId, completed, score);
 
   // Check for an existing row so we can distinguish stub vs. completed.
   const { data: existing } = await supabase
@@ -36,6 +39,8 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   const alreadyCompleted = !!existing?.completed_at;
+
+  console.log("[game-results] existing=%s alreadyCompleted=%s", !!existing, alreadyCompleted);
 
   if (existing) {
     // Row already exists. Only update if this is a final completion and it wasn't before.
@@ -52,6 +57,7 @@ export async function POST(request: NextRequest) {
     }
   } else {
     // First interaction — insert a row (stub or complete).
+    console.log("[game-results] inserting new row completed=%s", completed);
     const { error } = await supabase.from("game_results").insert({
       user_id: user.id,
       puzzle_id: puzzleId,
@@ -62,8 +68,10 @@ export async function POST(request: NextRequest) {
     });
 
     if (error) {
+      console.error("[game-results] insert error:", error.message, error.code);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    console.log("[game-results] insert OK");
   }
 
   // Award coins only on new completions.

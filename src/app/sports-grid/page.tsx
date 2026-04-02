@@ -4,6 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import SportsGrid from "@/components/grid/SportsGrid";
 import GridEmptyState from "@/components/grid/GridEmptyState";
 
+// Always render fresh — never serve a cached version of this page.
+export const dynamic = "force-dynamic";
+
 const MAX_GRID_PLAYS_PER_SPORT = 1;
 
 export const metadata: Metadata = {
@@ -62,7 +65,9 @@ export default async function SportsGridPage({
 
           <div className="grid grid-cols-2 gap-4 w-full">
             {SPORT_OPTIONS.map(({ sport: s, emoji, activeColor }) => (
-              <Link
+              // Use <a> (not <Link>) to force a full server render and bypass
+              // the Next.js Router Cache, so the daily limit check always runs.
+              <a
                 key={s}
                 href={`/sports-grid?sport=${s}`}
                 className={[
@@ -73,7 +78,7 @@ export default async function SportsGridPage({
               >
                 <span className="text-4xl">{emoji}</span>
                 <span>{s}</span>
-              </Link>
+              </a>
             ))}
           </div>
         </div>

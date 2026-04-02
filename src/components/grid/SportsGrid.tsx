@@ -143,8 +143,6 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       });
       // Notify the navbar to refresh the coin balance.
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
-      // Bust the Next.js Router Cache so the daily limit check re-runs on next visit.
-      router.refresh();
     } catch {
       // Silent fail — game result saving is non-critical
     }
@@ -291,7 +289,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
               </button>
               <button
                 type="button"
-                onClick={() => { router.refresh(); router.push("/sports-grid"); }}
+                onClick={() => { window.location.href = "/sports-grid"; }}
                 className="w-full rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 font-bold py-3 text-sm hover:bg-red-500/30 transition-colors"
               >
                 Yes, I Give Up
