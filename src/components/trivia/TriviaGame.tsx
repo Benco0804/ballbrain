@@ -342,7 +342,7 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
   const timerColor = timeLeft > 10 ? "bg-yellow-400" : timeLeft > 5 ? "bg-orange-400" : "bg-red-500";
 
   return (
-    <div className="md:grid md:grid-cols-[1fr_9rem] md:gap-6 md:items-start">
+    <div className="pt-6 md:pt-0 md:grid md:grid-cols-[1fr_9rem] md:gap-6 md:items-start">
       {/* Main content — on mobile this is plain block flow, no flex wrapper */}
       <div>
         {/* Final question banner */}
