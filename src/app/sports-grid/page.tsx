@@ -118,20 +118,6 @@ export default async function SportsGridPage({
           </span>
         </div>
 
-        {/* Sport switcher */}
-        <div className="flex gap-2">
-          {SPORT_OPTIONS.map(({ sport: s, emoji, color, activeColor }) => (
-            <Link
-              key={s}
-              href={`/sports-grid?sport=${s}`}
-              className={`flex-1 text-center rounded-xl py-2 text-sm font-semibold border transition-colors hover:opacity-80 ${
-                s === sport ? activeColor : color
-              }`}
-            >
-              {emoji} {s}
-            </Link>
-          ))}
-        </div>
       </div>
 
       {/* Grid or no-puzzle fallback */}
@@ -146,6 +132,7 @@ export default async function SportsGridPage({
         ) : (
           <SportsGrid
             puzzleId={puzzle.id}
+            sport={sport}
             rowCategories={rowCategories}
             colCategories={colCategories}
             validPlayers={validPlayers}

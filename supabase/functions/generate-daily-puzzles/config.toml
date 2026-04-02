@@ -1,0 +1,2 @@
+[functions.generate-daily-puzzles]
+verify_jwt = false

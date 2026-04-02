@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { normalize } from "@/lib/sports/normalize";
 import { ECONOMY } from "@/lib/economy/constants";
 import ResultModal from "./ResultModal";
@@ -13,6 +14,7 @@ interface GridCategory {
 
 interface SportsGridProps {
   puzzleId: string;
+  sport: "NBA" | "Soccer";
   rowCategories: GridCategory[];
   colCategories: GridCategory[];
   /** Maps "row-col" cell keys to the list of accepted player names for that cell. */
@@ -20,6 +22,11 @@ interface SportsGridProps {
   isAuthenticated: boolean;
   nextPuzzleUrl: string | null;
 }
+
+const SPORT_OPTIONS: { sport: "NBA" | "Soccer"; emoji: string; color: string; activeColor: string }[] = [
+  { sport: "NBA",    emoji: "🏀", color: "text-orange-400 border-orange-500/30 bg-orange-500/10", activeColor: "text-orange-300 border-orange-400 bg-orange-400/20" },
+  { sport: "Soccer", emoji: "⚽", color: "text-green-400 border-green-500/30 bg-green-500/10",    activeColor: "text-green-300 border-green-400 bg-green-400/20" },
+];
 
 const SPORT_COLORS: Record<GridCategory["sport"], string> = {
   NBA: "text-orange-400",
@@ -32,8 +39,10 @@ const TOTAL_CELLS = 9;
 
 type CellState = { status: "correct"; name: string } | { status: "wrong" } | { status: "idle" };
 
-export default function SportsGrid({ puzzleId, rowCategories, colCategories, validPlayers, isAuthenticated, nextPuzzleUrl }: SportsGridProps) {
+export default function SportsGrid({ puzzleId, sport, rowCategories, colCategories, validPlayers, isAuthenticated, nextPuzzleUrl }: SportsGridProps) {
+  const router = useRouter();
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
+  const [pendingNavSport, setPendingNavSport] = useState<"NBA" | "Soccer" | null>(null);
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
   const [inputValue, setInputValue] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -207,8 +216,61 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
   const correctCount = Object.values(cellStates).filter((s) => s.status === "correct").length;
   const guessesLeft = MAX_GUESSES - guessesUsed;
 
+  function handleSportTabClick(s: "NBA" | "Soccer") {
+    if (s === sport) return;
+    if (guessesUsed > 0) {
+      setPendingNavSport(s);
+    } else {
+      router.push(`/sports-grid?sport=${s}`);
+    }
+  }
+
   return (
     <div className="select-none">
+      {/* Sport switcher */}
+      <div className="flex gap-2 mb-6">
+        {SPORT_OPTIONS.map(({ sport: s, emoji, color, activeColor }) => (
+          <button
+            key={s}
+            type="button"
+            onClick={() => handleSportTabClick(s)}
+            className={`flex-1 text-center rounded-xl py-2 text-sm font-semibold border transition-colors hover:opacity-80 ${
+              s === sport ? activeColor : color
+            }`}
+          >
+            {emoji} {s}
+          </button>
+        ))}
+      </div>
+
+      {/* Confirmation modal */}
+      {pendingNavSport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 p-6 flex flex-col gap-4">
+            <h2 className="text-xl font-extrabold text-white">Quitting already? 👀</h2>
+            <p className="text-sm text-zinc-400">
+              Your current game will be abandoned and you&apos;ll lose your progress.
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingNavSport(null)}
+                className="w-full rounded-xl bg-green-500 text-white font-bold py-3 text-sm hover:bg-green-400 transition-colors"
+              >
+                Keep Playing
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/sports-grid")}
+                className="w-full rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 font-bold py-3 text-sm hover:bg-red-500/30 transition-colors"
+              >
+                Yes, I Give Up
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Status bar */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
