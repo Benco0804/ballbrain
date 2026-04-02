@@ -8,10 +8,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { puzzleId, score, guessesUsed, cellsFilled, completed } = body;
+  const { sessionId, puzzleId, sport, score, guessesUsed, cellsFilled, completed } = body;
 
   if (
+    typeof sessionId !== "string" ||
     typeof puzzleId !== "string" ||
+    typeof sport !== "string" ||
     typeof score !== "number" ||
     typeof guessesUsed !== "number" ||
     typeof cellsFilled !== "object" ||
@@ -24,43 +26,36 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    console.log("[game-results] unauthenticated — skipping save");
     return NextResponse.json({ saved: false, reason: "unauthenticated", coinsEarned: 0 });
   }
 
-  console.log("[game-results] user=%s puzzle=%s completed=%s score=%d", user.id, puzzleId, completed, score);
+  const today = new Date().toISOString().split("T")[0];
+  console.log("[game-results] user=%s sport=%s sessionId=%s completed=%s", user.id, sport, sessionId, completed);
 
-  // Check for an existing row so we can distinguish stub vs. completed.
+  // Check if this session already has a row.
   const { data: existing } = await supabase
     .from("game_results")
     .select("id, completed_at")
-    .eq("user_id", user.id)
-    .eq("puzzle_id", puzzleId)
+    .eq("session_id", sessionId)
     .maybeSingle();
 
-  const alreadyCompleted = !!existing?.completed_at;
-
-  console.log("[game-results] existing=%s alreadyCompleted=%s", !!existing, alreadyCompleted);
-
   if (existing) {
-    // Row already exists. Only update if this is a final completion and it wasn't before.
-    if (completed && !alreadyCompleted) {
+    // Session row exists — only update if this is the first completion.
+    if (completed && !existing.completed_at) {
       await supabase
         .from("game_results")
-        .update({
-          score,
-          guesses_used: guessesUsed,
-          cells_filled: cellsFilled,
-          completed_at: new Date().toISOString(),
-        })
+        .update({ score, guesses_used: guessesUsed, cells_filled: cellsFilled, completed_at: new Date().toISOString() })
         .eq("id", existing.id);
+      console.log("[game-results] updated session to completed");
     }
   } else {
-    // First interaction — insert a row (stub or complete).
-    console.log("[game-results] inserting new row completed=%s", completed);
+    // New session — insert stub or complete row.
     const { error } = await supabase.from("game_results").insert({
+      session_id: sessionId,
       user_id: user.id,
       puzzle_id: puzzleId,
+      sport,
+      play_date: today,
       score,
       guesses_used: guessesUsed,
       cells_filled: cellsFilled,
@@ -71,11 +66,25 @@ export async function POST(request: NextRequest) {
       console.error("[game-results] insert error:", error.message, error.code);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
-    console.log("[game-results] insert OK");
+    console.log("[game-results] inserted new session row completed=%s", completed);
   }
 
-  // Award coins only on new completions.
-  if (!completed || alreadyCompleted) {
+  // Award coins only on new completions, and only once per puzzle per day.
+  if (!completed || existing?.completed_at) {
+    return NextResponse.json({ saved: true, coinsEarned: 0 });
+  }
+
+  // Check if any other session already awarded coins for this puzzle today.
+  const { count: priorCompletions } = await supabase
+    .from("game_results")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("puzzle_id", puzzleId)
+    .eq("play_date", today)
+    .not("session_id", "eq", sessionId)
+    .not("completed_at", "is", null);
+
+  if ((priorCompletions ?? 0) > 0) {
     return NextResponse.json({ saved: true, coinsEarned: 0 });
   }
 

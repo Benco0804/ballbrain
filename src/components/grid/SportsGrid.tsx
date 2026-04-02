@@ -36,11 +36,20 @@ const SPORT_COLORS: Record<GridCategory["sport"], string> = {
 
 const MAX_GUESSES = 9;
 const TOTAL_CELLS = 9;
+const MAX_PLAYS_PER_SPORT = 2;
+
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
+function lsKey(sport: string) {
+  return `ballbrain_grid_${sport}_${todayStr()}`;
+}
 
 type CellState = { status: "correct"; name: string } | { status: "wrong" } | { status: "idle" };
 
 export default function SportsGrid({ puzzleId, sport, rowCategories, colCategories, validPlayers, isAuthenticated, nextPuzzleUrl }: SportsGridProps) {
   const router = useRouter();
+  const [clientBlocked, setClientBlocked] = useState(false);
   const [selectedCell, setSelectedCell] = useState<string | null>(null);
   const [pendingNavSport, setPendingNavSport] = useState<"NBA" | "Soccer" | null>(null);
   const [cellStates, setCellStates] = useState<Record<string, CellState>>({});
@@ -58,6 +67,15 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   const [hintError, setHintError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const stubSavedRef = useRef(false);
+  // Stable session ID for this play — identifies this row in game_results.
+  const sessionIdRef = useRef(crypto.randomUUID());
+
+  // Client-side play count check (catches Router Cache / bfcache bypasses).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const plays = parseInt(localStorage.getItem(lsKey(sport)) ?? "0");
+    if (plays >= MAX_PLAYS_PER_SPORT) setClientBlocked(true);
+  }, [sport, isAuthenticated]);
 
   function cellKey(row: number, col: number) {
     return `${row}-${col}`;
@@ -139,7 +157,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       await fetch("/api/game-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ puzzleId, score, guessesUsed: totalGuesses, cellsFilled, completed: true }),
+        body: JSON.stringify({ sessionId: sessionIdRef.current, puzzleId, sport, score, guessesUsed: totalGuesses, cellsFilled, completed: true }),
       });
       // Notify the navbar to refresh the coin balance.
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
@@ -163,10 +181,14 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     // On first guess, write a stub row so the daily limit kicks in immediately.
     if (!stubSavedRef.current && isAuthenticated) {
       stubSavedRef.current = true;
+      // Increment localStorage play count for client-side gating.
+      const key = lsKey(sport);
+      const plays = parseInt(localStorage.getItem(key) ?? "0") + 1;
+      localStorage.setItem(key, String(plays));
       fetch("/api/game-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ puzzleId, score: 0, guessesUsed: 0, cellsFilled: {}, completed: false }),
+        body: JSON.stringify({ sessionId: sessionIdRef.current, puzzleId, sport, score: 0, guessesUsed: 0, cellsFilled: {}, completed: false }),
       }).catch(() => {});
     }
 
@@ -243,6 +265,27 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
 
   const correctCount = Object.values(cellStates).filter((s) => s.status === "correct").length;
   const guessesLeft = MAX_GUESSES - guessesUsed;
+
+  // Client-side blocked screen (catches Router Cache / bfcache hits).
+  if (clientBlocked) {
+    const sportOption = SPORT_OPTIONS.find((o) => o.sport === sport)!;
+    return (
+      <div className="flex flex-col items-center text-center max-w-sm mx-auto gap-4 py-12">
+        <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-8 w-full">
+          <p className="text-white font-bold text-lg mb-2">
+            You&apos;ve used all your shots today! 🎯
+          </p>
+          <p className="text-zinc-400 text-sm">Come back tomorrow for more.</p>
+        </div>
+        <a
+          href="/sports-grid"
+          className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
+        >
+          ← Go Back
+        </a>
+      </div>
+    );
+  }
 
   function handleSportTabClick(s: "NBA" | "Soccer") {
     if (s === sport) return;
