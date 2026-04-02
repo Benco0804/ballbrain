@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+
 type Game = "both" | "grid" | "trivia";
 
 interface HowToPlayModalProps {
@@ -8,7 +11,6 @@ interface HowToPlayModalProps {
 }
 
 function MiniGrid() {
-  // 3×3 preview: some cells correct (green), one selected (yellow), rest empty
   const cells = [
     { type: "correct" },
     { type: "empty" },
@@ -112,19 +114,32 @@ function TriviaSection() {
   );
 }
 
-export default function HowToPlayModal({ game, onClose }: HowToPlayModalProps) {
+function ModalContent({ game, onClose }: HowToPlayModalProps) {
   return (
+    // Overlay — covers entire viewport, sits above everything
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
-      style={{ backgroundColor: "rgba(0,0,0,0.82)" }}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "1rem",
+        backgroundColor: "rgba(0,0,0,0.85)",
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="relative w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl overflow-hidden">
-        {/* Close button — top-right corner, always visible */}
+      {/* Modal card */}
+      <div
+        style={{ position: "relative", width: "100%", maxWidth: "24rem" }}
+        className="rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl"
+      >
+        {/* X close button — top-right corner */}
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 flex items-center justify-center text-zinc-300 hover:text-white transition-colors font-bold text-base"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-white transition-colors font-bold text-sm"
         >
           ✕
         </button>
@@ -136,13 +151,32 @@ export default function HowToPlayModal({ game, onClose }: HowToPlayModalProps) {
           </p>
         </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 overflow-y-auto max-h-[70vh] space-y-6">
+        {/* Scrollable body */}
+        <div className="px-6 py-5 overflow-y-auto space-y-6" style={{ maxHeight: "65vh" }}>
           {(game === "both" || game === "grid") && <GridSection />}
           {game === "both" && <div className="border-t border-zinc-800" />}
           {(game === "both" || game === "trivia") && <TriviaSection />}
         </div>
+
+        {/* Footer */}
+        <div className="px-6 pb-5 pt-2 border-t border-zinc-800">
+          <button
+            onClick={onClose}
+            className="w-full rounded-xl bg-yellow-400 text-zinc-950 font-extrabold py-3 text-sm hover:bg-yellow-300 transition-colors"
+          >
+            Got it! 💪
+          </button>
+        </div>
       </div>
     </div>
   );
+}
+
+export default function HowToPlayModal(props: HowToPlayModalProps) {
+  // Mount only on the client to avoid SSR mismatch with document.body
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  if (!mounted) return null;
+
+  return createPortal(<ModalContent {...props} />, document.body);
 }
