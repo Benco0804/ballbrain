@@ -150,6 +150,18 @@ export default function SportsGrid({ puzzleId, rowCategories, colCategories, val
     const newGuessesUsed = guessesUsed + 1;
 
     if (match) {
+      // Reject if this player is already placed in another cell.
+      const duplicate = Object.entries(cellStates).some(
+        ([key, state]) =>
+          key !== selectedCell &&
+          state.status === "correct" &&
+          normalize(state.name) === normalizedInput
+      );
+      if (duplicate) {
+        setFeedback("Player already used in another cell.");
+        return;
+      }
+
       const newStates = { ...cellStates, [selectedCell]: { status: "correct" as const, name: match } };
       const score = Object.values(newStates).filter((s) => s.status === "correct").length;
       const isComplete = score === TOTAL_CELLS || newGuessesUsed >= MAX_GUESSES;
