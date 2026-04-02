@@ -47,7 +47,7 @@ export default function NavbarActions({ coins: initialCoins, avatarUrl, username
           onClick={() => setShowHowToPlay(true)}
           className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"
         >
-          How to Play? ❓
+          New here? 👀
         </button>
         <Link
           href="/login"
@@ -69,7 +69,7 @@ export default function NavbarActions({ coins: initialCoins, avatarUrl, username
         onClick={() => setShowHowToPlay(true)}
         className="hidden sm:block rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 hover:border-zinc-500 hover:text-white transition-colors"
       >
-        How to Play? ❓
+        New here? 👀
       </button>
       <span className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-sm text-yellow-400">
         🪙 {coins.toLocaleString()}

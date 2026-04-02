@@ -115,22 +115,25 @@ function TriviaSection() {
 export default function HowToPlayModal({ game, onClose }: HowToPlayModalProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(0,0,0,0.82)" }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="relative w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl overflow-hidden">
+        {/* Close button — top-right corner, always visible */}
+        <button
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 flex items-center justify-center text-zinc-300 hover:text-white transition-colors font-bold text-base"
+        >
+          ✕
+        </button>
+
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+        <div className="px-6 pt-5 pb-4 border-b border-zinc-800">
           <p className="text-sm font-bold uppercase tracking-widest text-yellow-400">
             How to Play
           </p>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors text-sm font-bold"
-            aria-label="Close"
-          >
-            ✕
-          </button>
         </div>
 
         {/* Body */}
