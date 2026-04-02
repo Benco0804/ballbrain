@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SportsGrid from "@/components/grid/SportsGrid";
+import GridEmptyState from "@/components/grid/GridEmptyState";
 
 export const metadata: Metadata = {
   title: "Sports Grid — BallBrain",
@@ -123,12 +124,7 @@ export default async function SportsGridPage({
       {/* Grid or no-puzzle fallback */}
       <div className="w-full max-w-2xl">
         {error || !puzzle ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <p className="text-zinc-400 text-lg font-semibold">
-              No {sport} puzzle available today.
-            </p>
-            <p className="text-zinc-600 text-sm mt-2">Check back tomorrow!</p>
-          </div>
+          <GridEmptyState />
         ) : (
           <SportsGrid
             puzzleId={puzzle.id}
