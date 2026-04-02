@@ -114,9 +114,16 @@ function TriviaSection() {
   );
 }
 
+const SLIDES = [
+  { key: "grid",   label: "Sports Grid", emoji: "🟨" },
+  { key: "trivia", label: "Solo Trivia",  emoji: "🧠" },
+] as const;
+
 function ModalContent({ game, onClose }: HowToPlayModalProps) {
+  const [slide, setSlide] = useState(game === "trivia" ? 1 : 0);
+  const isCarousel = game === "both";
+
   return (
-    // Overlay — covers entire viewport, sits above everything
     <div
       style={{
         position: "fixed",
@@ -130,16 +137,15 @@ function ModalContent({ game, onClose }: HowToPlayModalProps) {
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* Modal card */}
       <div
         style={{ position: "relative", width: "100%", maxWidth: "24rem" }}
-        className="rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl"
+        className="rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl overflow-hidden"
       >
-        {/* X close button — top-right corner */}
+        {/* X close button */}
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-white transition-colors font-bold text-sm"
+          className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-zinc-800 border border-zinc-600 hover:bg-zinc-700 hover:border-zinc-400 flex items-center justify-center text-zinc-300 hover:text-white transition-colors font-bold text-sm"
         >
           ✕
         </button>
@@ -149,17 +155,78 @@ function ModalContent({ game, onClose }: HowToPlayModalProps) {
           <p className="text-sm font-bold uppercase tracking-widest text-yellow-400">
             How to Play
           </p>
+          {isCarousel && (
+            <p className="mt-0.5 text-base font-extrabold text-white">
+              {SLIDES[slide].emoji} {SLIDES[slide].label}
+            </p>
+          )}
         </div>
 
-        {/* Scrollable body */}
-        <div className="px-6 py-5 overflow-y-auto space-y-6" style={{ maxHeight: "65vh" }}>
-          {(game === "both" || game === "grid") && <GridSection />}
-          {game === "both" && <div className="border-t border-zinc-800" />}
-          {(game === "both" || game === "trivia") && <TriviaSection />}
-        </div>
+        {/* Carousel body */}
+        {isCarousel ? (
+          <div style={{ overflow: "hidden" }}>
+            <div
+              style={{
+                display: "flex",
+                transform: `translateX(-${slide * 100}%)`,
+                transition: "transform 0.3s cubic-bezier(0.4,0,0.2,1)",
+                willChange: "transform",
+              }}
+            >
+              <div style={{ minWidth: "100%" }} className="px-6 py-5">
+                <GridSection />
+              </div>
+              <div style={{ minWidth: "100%" }} className="px-6 py-5">
+                <TriviaSection />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="px-6 py-5 overflow-y-auto" style={{ maxHeight: "65vh" }}>
+            {game === "grid"   && <GridSection />}
+            {game === "trivia" && <TriviaSection />}
+          </div>
+        )}
 
         {/* Footer */}
-        <div className="px-6 pb-5 pt-2 border-t border-zinc-800">
+        <div className="px-6 pb-5 pt-3 border-t border-zinc-800 flex flex-col gap-3">
+          {/* Carousel navigation */}
+          {isCarousel && (
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setSlide(0)}
+                disabled={slide === 0}
+                className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
+                aria-label="Previous"
+              >
+                ←
+              </button>
+
+              {/* Dot indicators */}
+              <div className="flex gap-2">
+                {SLIDES.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSlide(i)}
+                    aria-label={SLIDES[i].label}
+                    className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                      i === slide ? "bg-yellow-400" : "bg-zinc-600 hover:bg-zinc-500"
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => setSlide(1)}
+                disabled={slide === 1}
+                className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-colors"
+                aria-label="Next"
+              >
+                →
+              </button>
+            </div>
+          )}
+
           <button
             onClick={onClose}
             className="w-full rounded-xl bg-yellow-400 text-zinc-950 font-extrabold py-3 text-sm hover:bg-yellow-300 transition-colors"
