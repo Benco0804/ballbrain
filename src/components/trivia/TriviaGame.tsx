@@ -72,20 +72,48 @@ export default function TriviaGame({ isAuthenticated, hasPlayedToday }: TriviaGa
   const revealTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Always-fresh ref to handleAnswer — prevents stale closure in timer effect.
   const handleAnswerRef = useRef<(i: number | null) => void>(() => {});
+  // Absolute timestamp (ms) when the current question expires.
+  const deadlineRef = useRef<number>(0);
 
   const questionNumber = questionIndex + 1; // 1-based
   const currentQuestion = questions[questionIndex] ?? null;
 
   // --- Timer ---
+
+  // Set a fresh deadline whenever a new question starts.
+  useEffect(() => {
+    if (phase === "playing") {
+      deadlineRef.current = Date.now() + TIMER_SECS * 1000;
+    }
+  }, [phase, questionIndex]);
+
+  // Poll every 200 ms; derive displayed time from the real deadline so drift
+  // and browser throttling in background tabs can't desync the countdown.
   useEffect(() => {
     if (phase !== "playing") return;
-    if (timeLeft <= 0) {
-      handleAnswerRef.current(null);
-      return;
-    }
-    const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [phase, timeLeft]);
+    const interval = setInterval(() => {
+      const remaining = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining <= 0) handleAnswerRef.current(null);
+    }, 200);
+    return () => clearInterval(interval);
+  }, [phase, questionIndex]);
+
+  // When the tab becomes visible again, immediately reconcile elapsed time.
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const remaining = Math.max(0, Math.round((deadlineRef.current - Date.now()) / 1000));
+      if (remaining <= 0) {
+        handleAnswerRef.current(null);
+      } else {
+        setTimeLeft(remaining);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [phase, questionIndex]);
 
   // Cleanup reveal timeout on unmount.
   useEffect(() => () => { if (revealTimeout.current) clearTimeout(revealTimeout.current); }, []);
