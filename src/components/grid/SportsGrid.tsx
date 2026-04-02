@@ -57,6 +57,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   const [hintLoading, setHintLoading] = useState(false);
   const [hintError, setHintError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const stubSavedRef = useRef(false);
 
   function cellKey(row: number, col: number) {
     return `${row}-${col}`;
@@ -138,7 +139,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       await fetch("/api/game-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ puzzleId, score, guessesUsed: totalGuesses, cellsFilled }),
+        body: JSON.stringify({ puzzleId, score, guessesUsed: totalGuesses, cellsFilled, completed: true }),
       });
       // Notify the navbar to refresh the coin balance.
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
@@ -157,6 +158,16 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     if (accepted.length === 0) {
       setFeedback("No valid answer exists for this combination.");
       return;
+    }
+
+    // On first guess, write a stub row so the daily limit kicks in immediately.
+    if (!stubSavedRef.current && isAuthenticated) {
+      stubSavedRef.current = true;
+      fetch("/api/game-results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ puzzleId, score: 0, guessesUsed: 0, cellsFilled: {}, completed: false }),
+      }).catch(() => {});
     }
 
     const normalizedInput = normalize(inputValue.trim());
