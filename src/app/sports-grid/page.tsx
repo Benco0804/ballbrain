@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import SportsGrid from "@/components/grid/SportsGrid";
 import GridEmptyState from "@/components/grid/GridEmptyState";
+import SportSelector from "@/components/grid/SportSelector";
 
 // Always render fresh — never serve a cached version of this page.
 export const dynamic = "force-dynamic";
@@ -28,9 +29,9 @@ type PuzzleCell = {
   valid_players: string[];
 };
 
-const SPORT_OPTIONS: { sport: Sport; emoji: string; color: string; activeColor: string }[] = [
-  { sport: "NBA",    emoji: "🏀", color: "text-orange-400 border-orange-500/30 bg-orange-500/10", activeColor: "text-orange-300 border-orange-400 bg-orange-400/20" },
-  { sport: "Soccer", emoji: "⚽", color: "text-green-400 border-green-500/30 bg-green-500/10",    activeColor: "text-green-300 border-green-400 bg-green-400/20" },
+const SPORT_OPTIONS: { sport: Sport; emoji: string; activeColor: string }[] = [
+  { sport: "NBA",    emoji: "🏀", activeColor: "text-orange-300 border-orange-400 bg-orange-400/20" },
+  { sport: "Soccer", emoji: "⚽", activeColor: "text-green-300 border-green-400 bg-green-400/20" },
 ];
 
 function normalizeSport(raw: string | undefined): Sport | null {
@@ -54,6 +55,9 @@ export default async function SportsGridPage({
 
   // ── Sport selector screen ────────────────────────────────────────────────────
   if (!sport) {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
     return (
       <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4 py-16">
         <div className="flex flex-col items-center text-center max-w-sm w-full">
@@ -62,25 +66,8 @@ export default async function SportsGridPage({
           <p className="text-zinc-400 text-sm mb-10">
             Fill the 3×3 grid by naming athletes who match both criteria.
           </p>
-
-          <div className="grid grid-cols-2 gap-4 w-full">
-            {SPORT_OPTIONS.map(({ sport: s, emoji, activeColor }) => (
-              // Use <a> (not <Link>) to force a full server render and bypass
-              // the Next.js Router Cache, so the daily limit check always runs.
-              <a
-                key={s}
-                href={`/sports-grid?sport=${s}`}
-                className={[
-                  "flex flex-col items-center justify-center gap-2 rounded-2xl border-2 py-8 font-bold text-lg transition-colors",
-                  activeColor,
-                  "hover:opacity-90",
-                ].join(" ")}
-              >
-                <span className="text-4xl">{emoji}</span>
-                <span>{s}</span>
-              </a>
-            ))}
-          </div>
+          {/* SportSelector is a client component — reads localStorage for guests to set correct ?play=N */}
+          <SportSelector isAuthenticated={!!user} />
         </div>
       </main>
     );
@@ -91,46 +78,56 @@ export default async function SportsGridPage({
   const { data: { user } } = await supabase.auth.getUser();
   const today = new Date().toISOString().split("T")[0];
 
-  // ── Daily play limit check ───────────────────────────────────────────────────
-  // Query game_results directly by sport + play_date — no puzzle_date join needed.
+  // ── Determine play count → puzzle difficulty ─────────────────────────────────
+  // Auth users: count rows in game_results (authoritative, server-side).
+  // Guests:     client passed ?play=N from localStorage via SportSelector.
+  let playsToday = 0;
   if (user) {
-    const { count: playsToday } = await supabase
+    const { count } = await supabase
       .from("game_results")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("sport", sport)
       .eq("play_date", today);
-
-    console.log("[grid-limit] sport=%s user=%s playsToday=%d limit=%d", sport, user.id, playsToday, MAX_GRID_PLAYS_PER_SPORT);
-
-    if ((playsToday ?? 0) >= MAX_GRID_PLAYS_PER_SPORT) {
-      return (
-        <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4">
-          <div className="flex flex-col items-center text-center max-w-sm w-full gap-4">
-            <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-8 w-full">
-              <p className="text-white font-bold text-lg mb-2">
-                You&apos;ve used all your shots today! 🎯
-              </p>
-              <p className="text-zinc-400 text-sm">Come back tomorrow for more.</p>
-            </div>
-            <Link
-              href="/sports-grid"
-              className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
-            >
-              ← Go Back
-            </Link>
-          </div>
-        </main>
-      );
-    }
+    playsToday = count ?? 0;
+  } else {
+    const playParam = typeof params.play === "string" ? parseInt(params.play, 10) : 0;
+    playsToday = Number.isFinite(playParam) && playParam > 0 ? playParam : 0;
   }
+
+  console.log("[grid] sport=%s user=%s playsToday=%d limit=%d", sport, user?.id ?? "guest", playsToday, MAX_GRID_PLAYS_PER_SPORT);
+
+  // ── Daily play limit check ───────────────────────────────────────────────────
+  if (playsToday >= MAX_GRID_PLAYS_PER_SPORT) {
+    return (
+      <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4">
+        <div className="flex flex-col items-center text-center max-w-sm w-full gap-4">
+          <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-8 w-full">
+            <p className="text-white font-bold text-lg mb-2">
+              You&apos;ve used all your shots today! 🎯
+            </p>
+            <p className="text-zinc-400 text-sm">Come back tomorrow for more.</p>
+          </div>
+          <Link
+            href="/sports-grid"
+            className="rounded-xl bg-zinc-800 border border-zinc-700 hover:bg-zinc-700 hover:border-zinc-500 text-zinc-300 hover:text-white font-semibold px-6 py-3 text-sm transition-colors"
+          >
+            ← Go Back
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  // Play 0 → easy puzzle; play 1 → medium puzzle.
+  const difficulty = playsToday === 0 ? "easy" : "medium";
 
   const { data: puzzle, error } = await supabase
     .from("daily_puzzles")
     .select("id, puzzle_date, sport, difficulty, row_categories, col_categories, puzzle_cells(row_index, col_index, valid_players)")
     .eq("puzzle_date", today)
     .eq("sport", sport)
-    .eq("difficulty", "easy")
+    .eq("difficulty", difficulty)
     .single();
 
   const rowCategories = puzzle ? (puzzle.row_categories as unknown as CategoryData[]) : [];
