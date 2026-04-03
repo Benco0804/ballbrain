@@ -122,6 +122,8 @@ export default async function SportsGridPage({
   // Play 0 → easy puzzle; play 1 → medium puzzle.
   const difficulty = playsToday === 0 ? "easy" : "medium";
 
+  console.log("[grid-puzzle] querying sport=%s date=%s difficulty=%s user=%s", sport, today, difficulty, user?.id ?? "guest");
+
   const { data: puzzle, error } = await supabase
     .from("daily_puzzles")
     .select("id, puzzle_date, sport, difficulty, row_categories, col_categories, puzzle_cells(row_index, col_index, valid_players)")
@@ -129,6 +131,12 @@ export default async function SportsGridPage({
     .eq("sport", sport)
     .eq("difficulty", difficulty)
     .single();
+
+  if (error) {
+    console.error("[grid-puzzle] query failed sport=%s date=%s difficulty=%s code=%s msg=%s", sport, today, difficulty, error.code, error.message);
+  } else {
+    console.log("[grid-puzzle] found puzzleId=%s cells=%d", puzzle?.id, (puzzle?.puzzle_cells as unknown[])?.length ?? 0);
+  }
 
   const rowCategories = puzzle ? (puzzle.row_categories as unknown as CategoryData[]) : [];
   const colCategories = puzzle ? (puzzle.col_categories as unknown as CategoryData[]) : [];

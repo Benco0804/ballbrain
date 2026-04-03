@@ -303,8 +303,16 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     if (s === sport) return;
     if (guessesUsed > 0) {
       setPendingNavSport(s);
+    } else if (isAuthenticated) {
+      // Auth users: server reads DB for play count — no ?play param needed.
+      // Use full navigation to bypass Router Cache so the limit check always runs.
+      window.location.href = `/sports-grid?sport=${s}`;
     } else {
-      router.push(`/sports-grid?sport=${s}`);
+      // Guests: read play count from localStorage and pass as ?play=N so the server
+      // serves the correct difficulty (easy vs medium). Full navigation bypasses
+      // Router Cache which could serve a stale page that showed an empty state.
+      const count = getGuestCount("grid", s);
+      window.location.href = `/sports-grid?sport=${s}&play=${count}`;
     }
   }
 
