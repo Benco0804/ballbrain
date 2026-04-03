@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ECONOMY } from "@/lib/economy/constants";
 import { createClient } from "@/lib/supabase/client";
+import { getGuestCount, incrementGuestCount } from "@/lib/game/guestPlays";
 
 const MILESTONES = ECONOMY.SOLO_TRIVIA.MILESTONES as Record<number, number>;
 const MILESTONE_QS = new Set(Object.keys(MILESTONES).map(Number));
@@ -73,6 +74,7 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
 
   const [phase, setPhase] = useState<Phase>("start");
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [guestPlayedSports, setGuestPlayedSports] = useState<string[]>([]);
   const [questions, setQuestions] = useState<GameQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -89,6 +91,15 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
 
   const questionNumber = questionIndex + 1; // 1-based
   const currentQuestion = questions[questionIndex] ?? null;
+
+  // Load guest play history from localStorage on mount.
+  useEffect(() => {
+    if (isAuthenticated) return;
+    const played = (["NBA", "Soccer", "Mix"] as const).filter(
+      (s) => getGuestCount("trivia", s) >= 1
+    );
+    setGuestPlayedSports(played);
+  }, [isAuthenticated]);
 
   // --- Timer ---
 
@@ -162,6 +173,16 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
   handleAnswerRef.current = handleAnswer;
 
   async function savePlay(questionsAnswered: number, totalCoins: number) {
+    if (!isAuthenticated) {
+      // Guest: track locally and update state so same-session re-selection is blocked.
+      if (selectedSport) {
+        incrementGuestCount("trivia", selectedSport);
+        setGuestPlayedSports((prev) =>
+          prev.includes(selectedSport) ? prev : [...prev, selectedSport]
+        );
+      }
+      return;
+    }
     try {
       await fetch("/api/trivia/record", {
         method: "POST",
@@ -263,7 +284,7 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
           Earn up to <span className="text-yellow-400 font-semibold">500 coins</span>.
         </p>
 
-        {selectedSport && playedSportsToday.includes(selectedSport) ? (
+        {selectedSport && [...playedSportsToday, ...guestPlayedSports].includes(selectedSport) ? (
           /* Already played this sport today */
           <div className="flex flex-col items-center gap-4 w-full max-w-xs">
             <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-6 text-center w-full">

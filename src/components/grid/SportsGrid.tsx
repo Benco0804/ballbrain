@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { normalize } from "@/lib/sports/normalize";
 import { ECONOMY } from "@/lib/economy/constants";
+import { getGuestCount, incrementGuestCount } from "@/lib/game/guestPlays";
 import ResultModal from "./ResultModal";
 
 interface GridCategory {
@@ -72,9 +73,12 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
 
   // Client-side play count check (catches Router Cache / bfcache bypasses).
   useEffect(() => {
-    if (!isAuthenticated) return;
-    const plays = parseInt(localStorage.getItem(lsKey(sport)) ?? "0");
-    if (plays >= MAX_PLAYS_PER_SPORT) setClientBlocked(true);
+    if (isAuthenticated) {
+      const plays = parseInt(localStorage.getItem(lsKey(sport)) ?? "0");
+      if (plays >= MAX_PLAYS_PER_SPORT) setClientBlocked(true);
+    } else {
+      if (getGuestCount("grid", sport) >= MAX_PLAYS_PER_SPORT) setClientBlocked(true);
+    }
   }, [sport, isAuthenticated]);
 
   function cellKey(row: number, col: number) {
@@ -178,18 +182,23 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       return;
     }
 
-    // On first guess, write a stub row so the daily limit kicks in immediately.
-    if (!stubSavedRef.current && isAuthenticated) {
+    // On first guess, record a play so the daily limit kicks in immediately.
+    if (!stubSavedRef.current) {
       stubSavedRef.current = true;
-      // Increment localStorage play count for client-side gating.
-      const key = lsKey(sport);
-      const plays = parseInt(localStorage.getItem(key) ?? "0") + 1;
-      localStorage.setItem(key, String(plays));
-      fetch("/api/game-results", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId: sessionIdRef.current, puzzleId, sport, score: 0, guessesUsed: 0, cellsFilled: {}, completed: false }),
-      }).catch(() => {});
+      if (isAuthenticated) {
+        // Authenticated: increment localStorage + write stub row to DB.
+        const key = lsKey(sport);
+        const plays = parseInt(localStorage.getItem(key) ?? "0") + 1;
+        localStorage.setItem(key, String(plays));
+        fetch("/api/game-results", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId: sessionIdRef.current, puzzleId, sport, score: 0, guessesUsed: 0, cellsFilled: {}, completed: false }),
+        }).catch(() => {});
+      } else {
+        // Guest: localStorage only.
+        incrementGuestCount("grid", sport);
+      }
     }
 
     const normalizedInput = normalize(inputValue.trim());
