@@ -11,8 +11,9 @@ export default async function TriviaPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  // Fetch which sports the user has already played today.
-  let playedSportsToday: string[] = [];
+  // Count plays per sport today for the current user.
+  // Each variant (1 and 2) counts as one play, so max count is 2 per sport.
+  const playCountsBySport: Record<string, number> = {};
   if (user) {
     const today = new Date().toISOString().split("T")[0];
     const { data: plays } = await supabase
@@ -20,13 +21,15 @@ export default async function TriviaPage() {
       .select("sport")
       .eq("user_id", user.id)
       .eq("play_date", today);
-    playedSportsToday = plays?.map((p) => p.sport) ?? [];
+    for (const play of plays ?? []) {
+      playCountsBySport[play.sport] = (playCountsBySport[play.sport] ?? 0) + 1;
+    }
   }
 
   return (
     <div className="min-h-screen bg-zinc-950 text-white">
       <div className="mx-auto max-w-3xl px-4 py-10">
-        <TriviaGame isAuthenticated={!!user} playedSportsToday={playedSportsToday} />
+        <TriviaGame isAuthenticated={!!user} playCountsBySport={playCountsBySport} />
       </div>
     </div>
   );

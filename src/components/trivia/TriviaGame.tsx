@@ -42,7 +42,8 @@ interface GameQuestion {
 
 interface TriviaGameProps {
   isAuthenticated: boolean;
-  playedSportsToday: string[];
+  /** Server-side play count per sport today (auth users only). Max 2 per sport. */
+  playCountsBySport: Record<string, number>;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -69,12 +70,13 @@ function buildGameQuestion(row: {
   };
 }
 
-export default function TriviaGame({ isAuthenticated, playedSportsToday }: TriviaGameProps) {
+export default function TriviaGame({ isAuthenticated, playCountsBySport }: TriviaGameProps) {
   const router = useRouter();
 
   const [phase, setPhase] = useState<Phase>("start");
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
-  const [guestPlayedSports, setGuestPlayedSports] = useState<string[]>([]);
+  // Guest play counts per sport, populated from localStorage on mount.
+  const [guestPlayCounts, setGuestPlayCounts] = useState<Record<string, number>>({});
   const [questions, setQuestions] = useState<GameQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(false);
   const [questionIndex, setQuestionIndex] = useState(0);
@@ -88,17 +90,20 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
   const handleAnswerRef = useRef<(i: number | null) => void>(() => {});
   // Absolute timestamp (ms) when the current question expires.
   const deadlineRef = useRef<number>(0);
+  // Variant played in the current session (1 or 2), set in startGame.
+  const currentVariantRef = useRef<1 | 2>(1);
 
   const questionNumber = questionIndex + 1; // 1-based
   const currentQuestion = questions[questionIndex] ?? null;
 
-  // Load guest play history from localStorage on mount.
+  // Load guest play counts from localStorage on mount.
   useEffect(() => {
     if (isAuthenticated) return;
-    const played = (["NBA", "Soccer", "Mix"] as const).filter(
-      (s) => getGuestCount("trivia", s) >= 1
-    );
-    setGuestPlayedSports(played);
+    setGuestPlayCounts({
+      NBA:    getGuestCount("trivia", "NBA"),
+      Soccer: getGuestCount("trivia", "Soccer"),
+      Mix:    getGuestCount("trivia", "Mix"),
+    });
   }, [isAuthenticated]);
 
   // --- Timer ---
@@ -177,9 +182,10 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
       // Guest: track locally and update state so same-session re-selection is blocked.
       if (selectedSport) {
         incrementGuestCount("trivia", selectedSport);
-        setGuestPlayedSports((prev) =>
-          prev.includes(selectedSport) ? prev : [...prev, selectedSport]
-        );
+        setGuestPlayCounts((prev) => ({
+          ...prev,
+          [selectedSport]: (prev[selectedSport] ?? 0) + 1,
+        }));
       }
       return;
     }
@@ -187,7 +193,12 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
       await fetch("/api/trivia/record", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionsAnswered, coinsEarned: totalCoins, sport: selectedSport }),
+        body: JSON.stringify({
+          questionsAnswered,
+          coinsEarned: totalCoins,
+          sport: selectedSport,
+          variant: currentVariantRef.current,
+        }),
       });
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
     } catch {
@@ -199,51 +210,94 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
     if (!selectedSport) return;
     setLoadingQuestions(true);
 
+    // Determine which variant to serve based on today's play count.
+    const currentPlayCount = isAuthenticated
+      ? (playCountsBySport[selectedSport] ?? 0)
+      : (guestPlayCounts[selectedSport] ?? 0);
+    const variant: 1 | 2 = currentPlayCount === 0 ? 1 : 2;
+    currentVariantRef.current = variant;
+
     try {
       const supabase = createClient();
-      let query = supabase
-        .from("trivia_questions")
-        .select("question, sport, correct_answer, wrong_answers, difficulty")
-        .eq("status", "active");
 
+      type QuestionRow = { question: string; sport: string; correct_answer: string; wrong_answers: string[]; difficulty: string };
+      let selectedQuestions: QuestionRow[] | null = null;
+
+      // NBA/Soccer: fetch the pre-curated question set from daily_trivia_sessions.
+      // This guarantees variant 1 and variant 2 are different question sets.
       if (selectedSport !== "Mix") {
-        query = query.eq("sport", selectedSport);
+        const today = new Date().toISOString().split("T")[0];
+        const { data: session } = await supabase
+          .from("daily_trivia_sessions")
+          .select("question_ids")
+          .eq("session_date", today)
+          .eq("sport", selectedSport)
+          .eq("variant", variant)
+          .maybeSingle();
+
+        if (session?.question_ids?.length) {
+          const { data: qData } = await supabase
+            .from("trivia_questions")
+            .select("question, sport, correct_answer, wrong_answers, difficulty")
+            .in("id", session.question_ids)
+            .eq("status", "active");
+
+          if (qData && qData.length > 0) {
+            selectedQuestions = shuffle(qData).slice(0, TOTAL_QS);
+          }
+        }
       }
 
-      const { data, error } = await query;
+      // Fallback: Mix mode or no session found — build set via difficulty progression.
+      if (!selectedQuestions) {
+        let query = supabase
+          .from("trivia_questions")
+          .select("question, sport, correct_answer, wrong_answers, difficulty")
+          .eq("status", "active");
 
-      if (error || !data || data.length === 0) {
+        if (selectedSport !== "Mix") {
+          query = query.eq("sport", selectedSport);
+        }
+
+        const { data, error } = await query;
+
+        if (error || !data || data.length === 0) {
+          setLoadingQuestions(false);
+          return;
+        }
+
+        const byDiff: Record<Difficulty, typeof data> = {
+          easy:   shuffle(data.filter((q) => q.difficulty === "easy")),
+          medium: shuffle(data.filter((q) => q.difficulty === "medium")),
+          hard:   shuffle(data.filter((q) => q.difficulty === "hard")),
+        };
+        const usedIdx: Record<Difficulty, number> = { easy: 0, medium: 0, hard: 0 };
+        const FALLBACK: Record<Difficulty, Difficulty[]> = {
+          easy:   ["easy", "medium", "hard"],
+          medium: ["medium", "easy", "hard"],
+          hard:   ["hard", "medium", "easy"],
+        };
+
+        const selected: typeof data = [];
+        for (const diff of buildDifficultyProgression()) {
+          for (const d of FALLBACK[diff]) {
+            if (usedIdx[d] < byDiff[d].length) {
+              selected.push(byDiff[d][usedIdx[d]]);
+              usedIdx[d]++;
+              break;
+            }
+          }
+          if (selected.length === TOTAL_QS) break;
+        }
+        selectedQuestions = selected;
+      }
+
+      if (!selectedQuestions || selectedQuestions.length === 0) {
         setLoadingQuestions(false);
         return;
       }
 
-      // Group by difficulty, each bucket already shuffled.
-      const byDiff: Record<Difficulty, typeof data> = {
-        easy:   shuffle(data.filter((q) => q.difficulty === "easy")),
-        medium: shuffle(data.filter((q) => q.difficulty === "medium")),
-        hard:   shuffle(data.filter((q) => q.difficulty === "hard")),
-      };
-      const usedIdx: Record<Difficulty, number> = { easy: 0, medium: 0, hard: 0 };
-
-      const FALLBACK: Record<Difficulty, Difficulty[]> = {
-        easy:   ["easy", "medium", "hard"],
-        medium: ["medium", "easy", "hard"],
-        hard:   ["hard", "medium", "easy"],
-      };
-
-      const selected: typeof data = [];
-      for (const diff of buildDifficultyProgression()) {
-        for (const d of FALLBACK[diff]) {
-          if (usedIdx[d] < byDiff[d].length) {
-            selected.push(byDiff[d][usedIdx[d]]);
-            usedIdx[d]++;
-            break;
-          }
-        }
-        if (selected.length === TOTAL_QS) break;
-      }
-
-      setQuestions(selected.map(buildGameQuestion));
+      setQuestions(selectedQuestions.map(buildGameQuestion));
     } catch {
       setLoadingQuestions(false);
       return;
@@ -284,7 +338,7 @@ export default function TriviaGame({ isAuthenticated, playedSportsToday }: Trivi
           Earn up to <span className="text-yellow-400 font-semibold">500 coins</span>.
         </p>
 
-        {selectedSport && [...playedSportsToday, ...guestPlayedSports].includes(selectedSport) ? (
+        {selectedSport && (isAuthenticated ? playCountsBySport[selectedSport] ?? 0 : guestPlayCounts[selectedSport] ?? 0) >= 2 ? (
           /* Already played this sport today */
           <div className="flex flex-col items-center gap-4 w-full max-w-xs">
             <div className="rounded-2xl bg-zinc-800 border border-zinc-700 px-8 py-6 text-center w-full">

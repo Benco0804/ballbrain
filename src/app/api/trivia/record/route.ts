@@ -7,12 +7,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { questionsAnswered, coinsEarned, sport } = body;
+  const { questionsAnswered, coinsEarned, sport, variant } = body;
 
   if (
     typeof questionsAnswered !== "number" ||
     typeof coinsEarned !== "number" ||
-    typeof sport !== "string"
+    typeof sport !== "string" ||
+    (variant !== 1 && variant !== 2)
   ) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
@@ -26,11 +27,12 @@ export async function POST(request: NextRequest) {
 
   const today = new Date().toISOString().split("T")[0];
 
-  // Idempotent insert — if user already has a play for today + sport, do nothing.
+  // Idempotent insert — unique on (user_id, play_date, sport, variant).
   const { error: insertError } = await supabase.from("solo_trivia_plays").insert({
     user_id: user.id,
     play_date: today,
     sport,
+    variant,
     questions_answered: questionsAnswered,
     coins_earned: coinsEarned,
     completed_at: new Date().toISOString(),
