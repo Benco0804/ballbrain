@@ -157,6 +157,11 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     // Show modal after a brief pause so the player sees their final board.
     setTimeout(() => setShowModal(true), 700);
 
+    // Guest play tracking: record the completed game against the daily limit.
+    if (!isAuthenticated) {
+      incrementGuestCount("grid", sport);
+    }
+
     try {
       await fetch("/api/game-results", {
         method: "POST",
@@ -195,10 +200,8 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId: sessionIdRef.current, puzzleId, sport, score: 0, guessesUsed: 0, cellsFilled: {}, completed: false }),
         }).catch(() => {});
-      } else {
-        // Guest: localStorage only.
-        incrementGuestCount("grid", sport);
       }
+      // Guests: count is incremented in saveResult (on game completion), not here.
     }
 
     const normalizedInput = normalize(inputValue.trim());
