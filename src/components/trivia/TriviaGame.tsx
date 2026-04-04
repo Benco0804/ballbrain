@@ -694,8 +694,8 @@ export default function TriviaGame({ isAuthenticated, playCountsBySport }: Trivi
               {selectedIndex === currentQuestion.correctIndex
                 ? "✅ Nailed it!"
                 : selectedIndex !== null
-                  ? strikes < MAX_STRIKES
-                    ? `❌ Wrong! ${MAX_STRIKES - strikes} life left — keep going`
+                  ? strikes + 1 < MAX_STRIKES
+                    ? `❌ Wrong! ${MAX_STRIKES - strikes - 1} life left — keep going`
                     : `❌ Ouch! The answer was ${currentQuestion.answers[currentQuestion.correctIndex]}`
                   : null}
             </p>
