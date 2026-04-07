@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { flushSync } from "react-dom";
 import { useRouter } from "next/navigation";
 import { normalize } from "@/lib/sports/normalize";
 import { ECONOMY } from "@/lib/economy/constants";
@@ -66,7 +67,11 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [hintLoading, setHintLoading] = useState(false);
   const [hintError, setHintError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const stubSavedRef = useRef(false);
   // Stable session ID for this play — identifies this row in game_results.
   const sessionIdRef = useRef(crypto.randomUUID());
@@ -273,7 +278,27 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       inputRef.current.focus({ preventScroll: true });
       inputRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
     }
+    setSuggestions([]);
+    setSuggestionIndex(-1);
   }, [selectedCell]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setSuggestions([]);
+        setSuggestionIndex(-1);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  function selectSuggestion(name: string) {
+    flushSync(() => setInputValue(name));
+    setSuggestions([]);
+    setSuggestionIndex(-1);
+    formRef.current?.requestSubmit();
+  }
 
   const correctCount = Object.values(cellStates).filter((s) => s.status === "correct").length;
   const guessesLeft = MAX_GUESSES - guessesUsed;
@@ -467,16 +492,66 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
 
       {/* Guess input — hidden once game ends */}
       {!gameOver && selectedCell && (
-        <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
+        <form ref={formRef} onSubmit={handleSubmit} className="mt-4 flex flex-col gap-2">
           <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => { setInputValue(e.target.value); setFeedback(null); }}
-              placeholder="Type a player name…"
-              className={`flex-1 rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors${inputShaking ? " animate-shake" : ""}`}
-            />
+            <div className="relative flex-1" ref={dropdownRef}>
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setInputValue(val);
+                  setFeedback(null);
+                  setSuggestionIndex(-1);
+                  if (val.trim().length >= 2 && selectedCell) {
+                    const pool = validPlayers[selectedCell] ?? [];
+                    const lower = val.toLowerCase();
+                    setSuggestions(pool.filter(p => p.toLowerCase().includes(lower)).slice(0, 6));
+                  } else {
+                    setSuggestions([]);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (suggestions.length === 0) return;
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSuggestionIndex(i => Math.min(i + 1, suggestions.length - 1));
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSuggestionIndex(i => Math.max(i - 1, -1));
+                  } else if (e.key === "Enter" && suggestionIndex >= 0) {
+                    e.preventDefault();
+                    selectSuggestion(suggestions[suggestionIndex]);
+                  } else if (e.key === "Escape") {
+                    setSuggestions([]);
+                    setSuggestionIndex(-1);
+                  }
+                }}
+                placeholder="Type a player name…"
+                autoComplete="off"
+                className={`w-full rounded-xl bg-zinc-800 border-2 border-zinc-700 focus:border-yellow-400 outline-none px-4 py-3 text-white placeholder-zinc-500 text-sm transition-colors${inputShaking ? " animate-shake" : ""}`}
+              />
+              {suggestions.length > 0 && (
+                <ul className="absolute z-50 top-full left-0 right-0 mt-1 rounded-xl bg-zinc-800 border border-zinc-700 overflow-hidden shadow-lg">
+                  {suggestions.map((name, i) => (
+                    <li key={name}>
+                      <button
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); selectSuggestion(name); }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
+                          i === suggestionIndex
+                            ? "bg-yellow-400/20 text-yellow-300"
+                            : "text-zinc-300 hover:bg-zinc-700"
+                        }`}
+                      >
+                        {name}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <button
               type="submit"
               disabled={!inputValue.trim()}

@@ -1,0 +1,2 @@
+[functions.daily-health-check]
+verify_jwt = false

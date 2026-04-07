@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
+import { createClient } from "@/lib/supabase/server";
 import HomeGameCards from "@/components/home/HomeGameCards";
+import LandingPage from "@/components/ui/LandingPage";
 
 export const metadata: Metadata = {
   title: "BallBrain — Sports Trivia Gaming",
   description: "Daily sports trivia challenges. Test your knowledge of NBA and Soccer.",
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    return <LandingPage />;
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center justify-center px-4 py-16">
 
