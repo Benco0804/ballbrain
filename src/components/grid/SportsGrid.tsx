@@ -67,12 +67,17 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [hintLoading, setHintLoading] = useState(false);
   const [hintError, setHintError] = useState<string | null>(null);
+  const [reusedWarning, setReusedWarning] = useState(false);
+  const [uniquenessBonus, setUniquenessBonus] = useState(0);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const stubSavedRef = useRef(false);
+  // Stores the name already in a correct cell when the player opens it for editing,
+  // so a wrong guess can restore it instead of deleting the cell.
+  const editingPrevNameRef = useRef<string | null>(null);
   // Stable session ID for this play — identifies this row in game_results.
   const sessionIdRef = useRef(crypto.randomUUID());
 
@@ -93,9 +98,19 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   function handleCellClick(row: number, col: number) {
     if (gameOver) return;
     const key = cellKey(row, col);
-    if (cellStates[key]?.status === "correct") return;
-    setSelectedCell((prev) => (prev === key ? null : key));
-    setInputValue("");
+    // Toggle off — same cell clicked again cancels the edit.
+    if (selectedCell === key) {
+      setSelectedCell(null);
+      setInputValue("");
+      setFeedback(null);
+      setPositiveFeedback(null);
+      return;
+    }
+    const existing = cellStates[key];
+    editingPrevNameRef.current = existing?.status === "correct" ? existing.name : null;
+    setSelectedCell(key);
+    // Pre-fill with the current answer when opening a correct cell for editing.
+    setInputValue(existing?.status === "correct" ? existing.name : "");
     setFeedback(null);
     setPositiveFeedback(null);
   }
@@ -154,10 +169,25 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
 
     // Calculate coins locally for immediate display — server validates and persists.
     const isPerfect = score === 9;
+
+    // Uniqueness bonus: +5 per cell where the player appears only once across all correct cells.
+    const playerCounts: Record<string, number> = {};
+    for (const state of Object.values(states)) {
+      if (state.status === "correct") {
+        const n = normalize(state.name);
+        playerCounts[n] = (playerCounts[n] || 0) + 1;
+      }
+    }
+    const uniqueBonus = Object.values(states).filter(
+      s => s.status === "correct" && playerCounts[normalize(s.name)] === 1
+    ).length * ECONOMY.SPORTS_GRID.UNIQUE_PLAYER_BONUS;
+
     const earned =
       score * ECONOMY.SPORTS_GRID.COINS_PER_CORRECT_CELL +
+      uniqueBonus +
       (isPerfect ? ECONOMY.SPORTS_GRID.PERFECT_BONUS : ECONOMY.SPORTS_GRID.PARTICIPATION);
     setCoinsEarned(earned);
+    setUniquenessBonus(uniqueBonus);
 
     // Show modal after a brief pause so the player sees their final board.
     setTimeout(() => setShowModal(true), 700);
@@ -210,23 +240,27 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     }
 
     const normalizedInput = normalize(inputValue.trim());
+
+    // Editing a correct cell with the same player — close without consuming a guess.
+    const existingState = cellStates[selectedCell];
+    if (existingState?.status === "correct" && normalize(existingState.name) === normalizedInput) {
+      setSelectedCell(null);
+      setInputValue("");
+      setFeedback(null);
+      return;
+    }
+
     const match = accepted.find((name) => normalize(name) === normalizedInput);
     const newGuessesUsed = guessesUsed + 1;
 
     if (match) {
-      // Reject if this player is already placed in another cell.
-      const duplicate = Object.entries(cellStates).some(
+      const cell = selectedCell; // capture before state updates clear it
+      const isReused = Object.entries(cellStates).some(
         ([key, state]) =>
-          key !== selectedCell &&
+          key !== cell &&
           state.status === "correct" &&
           normalize(state.name) === normalizedInput
       );
-      if (duplicate) {
-        setFeedback("🙄 Already used that one");
-        return;
-      }
-
-      const cell = selectedCell; // capture before state updates clear it
       const newStates = { ...cellStates, [cell]: { status: "correct" as const, name: match } };
       const score = Object.values(newStates).filter((s) => s.status === "correct").length;
       const isComplete = score === TOTAL_CELLS || newGuessesUsed >= MAX_GUESSES;
@@ -238,6 +272,10 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
       setFeedback(null);
       setJustCorrectCell(cell);
       setPositiveFeedback("🔥 Got it!");
+      if (isReused) {
+        setReusedWarning(true);
+        setTimeout(() => setReusedWarning(false), 1400);
+      }
       setTimeout(() => {
         setJustCorrectCell(null);
         setPositiveFeedback(null);
@@ -248,7 +286,9 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
         saveResult(score, newGuessesUsed, newStates);
       }
     } else {
-      const newStates = { ...cellStates, [selectedCell]: { status: "wrong" as const } };
+      const cell = selectedCell;
+      const prevName = editingPrevNameRef.current;
+      const newStates = { ...cellStates, [cell]: { status: "wrong" as const } };
       setCellStates(newStates);
       setGuessesUsed(newGuessesUsed);
       setFeedback("❌ Nope!");
@@ -260,12 +300,22 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
 
       if (isComplete) {
         setGameOver(true);
-        saveResult(score, newGuessesUsed, cellStates);
+        // If we were editing a correct cell, restore it before saving.
+        const finalStates = prevName !== null
+          ? { ...newStates, [cell]: { status: "correct" as const, name: prevName } }
+          : newStates;
+        saveResult(score, newGuessesUsed, finalStates);
       } else {
         setTimeout(() => {
           setCellStates((prev) => {
             const next = { ...prev };
-            if (next[selectedCell]?.status === "wrong") delete next[selectedCell];
+            if (next[cell]?.status === "wrong") {
+              if (prevName !== null) {
+                next[cell] = { status: "correct" as const, name: prevName };
+              } else {
+                delete next[cell];
+              }
+            }
             return next;
           });
         }, 1200);
@@ -280,6 +330,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     }
     setSuggestions([]);
     setSuggestionIndex(-1);
+    setReusedWarning(false);
   }, [selectedCell]);
 
   useEffect(() => {
@@ -460,24 +511,31 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
                 <button
                   key={key}
                   onClick={() => handleCellClick(ri, ci)}
-                  disabled={isCorrect || gameOver}
+                  disabled={gameOver}
                   className={[
-                    "flex items-center justify-center rounded-xl min-h-[96px] transition-all duration-300 px-2",
+                    "relative group flex items-center justify-center rounded-xl min-h-[96px] transition-all duration-300 px-2",
                     "border-2 text-sm text-center leading-tight font-semibold",
-                    isCorrect
-                      ? key === justCorrectCell
-                        ? "border-green-400 bg-green-400/50 text-green-200 scale-[1.05]"
-                        : "border-green-500 bg-green-500/20 text-green-300 cursor-default"
-                      : isWrong
-                        ? "border-red-500 bg-red-500/20 text-red-400"
-                        : isSelected
-                          ? "border-yellow-400 bg-yellow-400/10 text-yellow-300 scale-[1.03]"
+                    isSelected
+                      ? "border-yellow-400 bg-yellow-400/10 text-yellow-300 scale-[1.03]"
+                      : isCorrect
+                        ? key === justCorrectCell
+                          ? "border-green-400 bg-green-400/50 text-green-200 scale-[1.05]"
+                          : "border-green-500 bg-green-500/20 text-green-300"
+                        : isWrong
+                          ? "border-red-500 bg-red-500/20 text-red-400"
                           : gameOver
                             ? "border-zinc-700 bg-zinc-900 text-zinc-600 cursor-default"
                             : "border-zinc-700 bg-zinc-900 text-zinc-600 hover:border-zinc-500 hover:bg-zinc-800",
                   ].join(" ")}
                 >
-                  {isCorrect && state.status === "correct" ? state.name : isSelected ? "…" : ""}
+                  <span className="relative z-10">
+                    {isSelected ? "…" : (isCorrect && state.status === "correct" ? state.name : "")}
+                  </span>
+                  {isCorrect && !gameOver && !isSelected && (
+                    <span className="absolute inset-0 flex items-center justify-center rounded-xl bg-zinc-900/60 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-zinc-300 font-medium pointer-events-none">
+                      ✏️
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -508,8 +566,18 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
                     const pool = validPlayers[selectedCell] ?? [];
                     const lower = val.toLowerCase();
                     setSuggestions(pool.filter(p => p.toLowerCase().includes(lower)).slice(0, 6));
+                    const normalizedVal = normalize(val.trim());
+                    setReusedWarning(
+                      Object.entries(cellStates).some(
+                        ([key, state]) =>
+                          key !== selectedCell &&
+                          state.status === "correct" &&
+                          normalize(state.name) === normalizedVal
+                      )
+                    );
                   } else {
                     setSuggestions([]);
+                    setReusedWarning(false);
                   }
                 }}
                 onKeyDown={(e) => {
@@ -526,6 +594,9 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
                   } else if (e.key === "Escape") {
                     setSuggestions([]);
                     setSuggestionIndex(-1);
+                    setSelectedCell(null);
+                    setInputValue("");
+                    setFeedback(null);
                   }
                 }}
                 placeholder="Type a player name…"
@@ -563,6 +634,9 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
           {feedback && (
             <p className="text-sm text-red-400 px-1">{feedback}</p>
           )}
+          {reusedWarning && (
+            <p className="text-xs text-zinc-500 px-1">Reused player — no bonus</p>
+          )}
 
           {/* Hint row */}
           <div className="flex items-center gap-3 px-1">
@@ -587,12 +661,17 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
         </form>
       )}
 
+      {reusedWarning && (
+        <p className="mt-2 text-xs text-zinc-500 text-center">Reused player — no bonus</p>
+      )}
+
       {/* Result modal — shown 700ms after game ends */}
       {showModal && (
         <ResultModal
           won={correctCount === TOTAL_CELLS}
           correctCount={correctCount}
           coinsEarned={coinsEarned}
+          uniquenessBonus={uniquenessBonus}
           cellStates={cellStates}
           validPlayers={validPlayers}
           rowCategories={rowCategories}

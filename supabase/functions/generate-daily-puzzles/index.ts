@@ -20,6 +20,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 const MIN_PLAYERS_PER_CELL = 3;
 const MAX_ATTEMPTS_PER_PUZZLE = 100;
 const DIFFICULTY_SLOTS = ["easy", "medium", "hard"] as const;
+const DRAFT_DECOY_COUNT = 3;
+const DRAFT_PLAYER_POOL_FETCH = 150; // how many players to pull when finding decoys
 const QUESTIONS_PER_SESSION = 10;
 const SESSIONS_PER_SPORT = 2;
 
@@ -86,6 +88,37 @@ const SOCCER_ROW_CRITERIA: Criterion[] = [
   { id: "soccer-bundesliga",  label: "Played in the Bundesliga" },
   { id: "soccer-ligue1",      label: "Played in Ligue 1" },
   { id: "soccer-israeli",     label: "Played in Israeli Premier League" },
+];
+
+// Harder col criteria pools used for Draft Board puzzles.
+// Omits the broadest criteria (e.g. 5+ All-Stars, Won a League Title) in favour
+// of rarer achievements so the draft puzzle is more challenging.
+const NBA_DRAFT_COL_CRITERIA: Criterion[] = [
+  { id: "nba-finals-mvp",     label: "Finals MVP" },
+  { id: "nba-mvp",            label: "League MVP" },
+  { id: "nba-all-nba-first",  label: "All-NBA First Team" },
+  { id: "nba-10plus-allstar", label: "10+ All-Star Selections" },
+  { id: "nba-scoring-title",  label: "Scoring Title" },
+  { id: "nba-career-25ppg",   label: "Career 25+ PPG" },
+  { id: "nba-season-30ppg",   label: "30+ PPG Season" },
+  { id: "nba-career-20k",     label: "Career 20,000+ Points" },
+  { id: "nba-game-50pts",     label: "Scored 50+ in a Game" },
+  { id: "nba-td10-season",    label: "Triple-Double Season" },
+  { id: "nba-dpoy",           label: "Defensive Player of the Year" },
+  { id: "nba-champion",       label: "NBA Champion" },
+];
+
+const SOCCER_DRAFT_COL_CRITERIA: Criterion[] = [
+  { id: "soccer-ucl-winner",  label: "Champions League Winner" },
+  { id: "soccer-world-cup",   label: "World Cup Winner" },
+  { id: "soccer-ballon-dor",  label: "Ballon d'Or Winner" },
+  { id: "soccer-wc-boot",     label: "World Cup Golden Boot" },
+  { id: "soccer-30goals",     label: "30+ Goals in a Season" },
+  { id: "soccer-ucl-50apps",  label: "50+ UCL Appearances" },
+  { id: "soccer-100caps",     label: "100+ International Caps" },
+  { id: "soccer-no-ucl",      label: "Never Won the UCL" },
+  { id: "soccer-top-scorer",  label: "League Top Scorer" },
+  { id: "soccer-captain",     label: "National Team Captain" },
 ];
 
 const SOCCER_COL_CRITERIA: Criterion[] = [
@@ -268,6 +301,159 @@ async function generatePuzzlesForSport(
 }
 
 // ---------------------------------------------------------------------------
+// Draft Board puzzle generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates one 'draft' difficulty puzzle for a sport.
+ *
+ * A draft puzzle has:
+ *   • valid_players populated on all 9 cells (same as regular puzzles).
+ *   • draft_players — a JSON array of 12 names: one correct answer per cell
+ *     (picked so every answer is unique across cells) + 3 decoy players
+ *     who are NOT in any cell's valid_players, all pre-shuffled.
+ *
+ * Called AFTER generatePuzzlesForSport so the sport-wide delete in that
+ * function does not wipe a previously written draft row.
+ */
+async function generateDraftPuzzleForSport(
+  supabase: SupabaseClient,
+  sport: string,
+  targetDate: string,
+  rowCriteria: Criterion[],
+  draftColCriteria: Criterion[],
+): Promise<{ inserted: number; errors: string[] }> {
+  const errors: string[] = [];
+
+  // Find a valid 3×3 combo using the harder column criteria.
+  const result = await tryFindValidCombo(supabase, sport, rowCriteria, draftColCriteria);
+  if (!result) {
+    errors.push(
+      `${sport}/draft: no valid combo found after ${MAX_ATTEMPTS_PER_PUZZLE} attempts`,
+    );
+    return { inserted: 0, errors };
+  }
+
+  const { rows, cols, cells } = result;
+
+  // Build draft answers: one unique player per cell (row-major order).
+  // If the alphabetically-first valid player for a cell was already chosen
+  // for an earlier cell, try the next candidate so every answer card is unique.
+  const usedAnswers = new Set<string>();
+  const draftAnswers: string[] = [];
+
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      const key = `${r}-${c}`;
+      const candidates: string[] = cells[key] ?? [];
+      let answer: string | null = null;
+      for (const name of candidates) {
+        if (!usedAnswers.has(name)) {
+          answer = name;
+          usedAnswers.add(name);
+          break;
+        }
+      }
+      if (!answer) {
+        errors.push(
+          `${sport}/draft: could not find unique answer for cell ${key} — cell has ${candidates.length} candidates`,
+        );
+        return { inserted: 0, errors };
+      }
+      draftAnswers.push(answer);
+    }
+  }
+
+  // Collect every player name that is valid for any cell (to exclude as decoys).
+  const allValidNames = new Set<string>(Object.values(cells).flat());
+
+  // Fetch a pool of active players, then filter out valid ones in code.
+  // This avoids complex NOT IN query construction with player names that may
+  // contain apostrophes, accents, etc.
+  const { data: playerPool, error: poolErr } = await supabase
+    .from("players")
+    .select("name")
+    .eq("sport", sport)
+    .eq("active", true)
+    .limit(DRAFT_PLAYER_POOL_FETCH);
+
+  if (poolErr) {
+    errors.push(`${sport}/draft: player pool fetch failed: ${poolErr.message}`);
+    return { inserted: 0, errors };
+  }
+
+  const decoyPool = (playerPool ?? [])
+    .map((p: { name: string }) => p.name)
+    .filter((name: string) => !allValidNames.has(name));
+
+  const decoys = shuffle(decoyPool).slice(0, DRAFT_DECOY_COUNT);
+
+  if (decoys.length < DRAFT_DECOY_COUNT) {
+    errors.push(
+      `${sport}/draft: not enough decoy players (need ${DRAFT_DECOY_COUNT}, found ${decoys.length})`,
+    );
+    return { inserted: 0, errors };
+  }
+
+  // Shuffle the 12 cards so decoys are interleaved randomly.
+  const draftPlayers = shuffle([...draftAnswers, ...decoys]);
+
+  const rowCategories = rows.map((r) => ({
+    label: r.label,
+    sport,
+    categoryId: r.id,
+  }));
+  const colCategories = cols.map((c) => ({
+    label: c.label,
+    sport,
+    categoryId: c.id,
+  }));
+
+  const { data: puzzle, error: puzzleErr } = await supabase
+    .from("daily_puzzles")
+    .insert({
+      puzzle_date: targetDate,
+      sport,
+      difficulty: "draft",
+      row_categories: rowCategories,
+      col_categories: colCategories,
+      draft_players: draftPlayers,
+    })
+    .select("id")
+    .single();
+
+  if (puzzleErr || !puzzle) {
+    errors.push(
+      `${sport}/draft: puzzle insert failed: ${puzzleErr?.message}`,
+    );
+    return { inserted: 0, errors };
+  }
+
+  // Insert all 9 cells.
+  const cellRows = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 3; c++) {
+      cellRows.push({
+        puzzle_id: puzzle.id,
+        row_index: r,
+        col_index: c,
+        valid_players: cells[`${r}-${c}`],
+      });
+    }
+  }
+
+  const { error: cellsErr } = await supabase.from("puzzle_cells").insert(cellRows);
+
+  if (cellsErr) {
+    errors.push(`${sport}/draft: cells insert failed: ${cellsErr.message}`);
+    await supabase.from("daily_puzzles").delete().eq("id", puzzle.id);
+    return { inserted: 0, errors };
+  }
+
+  return { inserted: 1, errors };
+}
+
+// ---------------------------------------------------------------------------
 // Trivia session generation
 // ---------------------------------------------------------------------------
 async function generateTriviaSessions(
@@ -374,8 +560,8 @@ Deno.serve(async (req: Request) => {
 
   const summary = {
     targetDate: date,
-    nba: { puzzlesInserted: 0, triviaInserted: 0, errors: [] as string[] },
-    soccer: { puzzlesInserted: 0, triviaInserted: 0, errors: [] as string[] },
+    nba: { puzzlesInserted: 0, draftInserted: 0, triviaInserted: 0, errors: [] as string[] },
+    soccer: { puzzlesInserted: 0, draftInserted: 0, triviaInserted: 0, errors: [] as string[] },
   };
 
   // ── NBA ────────────────────────────────────────────────────────────────────
@@ -395,6 +581,17 @@ Deno.serve(async (req: Request) => {
   summary.soccer.puzzlesInserted = soccerPuzzles.inserted;
   summary.soccer.triviaInserted = soccerTrivia.inserted;
   summary.soccer.errors = [...soccerPuzzles.errors, ...soccerTrivia.errors];
+
+  // ── Draft Board (must run after generatePuzzlesForSport so the sport-wide
+  //    delete in that function does not wipe the draft row) ──────────────────
+  const [nbaDraft, soccerDraft] = await Promise.all([
+    generateDraftPuzzleForSport(supabase, "NBA",    date, NBA_ROW_CRITERIA,    NBA_DRAFT_COL_CRITERIA),
+    generateDraftPuzzleForSport(supabase, "Soccer", date, SOCCER_ROW_CRITERIA, SOCCER_DRAFT_COL_CRITERIA),
+  ]);
+  summary.nba.draftInserted    = nbaDraft.inserted;
+  summary.soccer.draftInserted = soccerDraft.inserted;
+  summary.nba.errors    = [...summary.nba.errors,    ...nbaDraft.errors];
+  summary.soccer.errors = [...summary.soccer.errors, ...soccerDraft.errors];
 
   const hasErrors =
     summary.nba.errors.length > 0 || summary.soccer.errors.length > 0;

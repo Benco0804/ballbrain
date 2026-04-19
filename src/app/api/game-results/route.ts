@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { sessionId, puzzleId, sport, score, guessesUsed, cellsFilled, completed } = body;
+  const { sessionId, puzzleId, sport, score, guessesUsed, cellsFilled, completed, gameMode } = body;
 
   if (
     typeof sessionId !== "string" ||
@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
   }
+
+  const resolvedGameMode: "sports-grid" | "draft-board" =
+    gameMode === "draft-board" ? "draft-board" : "sports-grid";
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -89,9 +92,19 @@ export async function POST(request: NextRequest) {
   }
 
   const isPerfect = score === 9;
-  const coinsEarned =
-    score * ECONOMY.SPORTS_GRID.COINS_PER_CORRECT_CELL +
-    (isPerfect ? ECONOMY.SPORTS_GRID.PERFECT_BONUS : ECONOMY.SPORTS_GRID.PARTICIPATION);
+  let coinsEarned: number;
+  if (resolvedGameMode === "draft-board") {
+    // In Draft Board each card is unique, so the uniqueness bonus always applies.
+    const uniqueBonus = score * ECONOMY.DRAFT_BOARD.UNIQUE_PLAYER_BONUS;
+    coinsEarned =
+      score * ECONOMY.DRAFT_BOARD.COINS_PER_CORRECT_CELL +
+      uniqueBonus +
+      (isPerfect ? ECONOMY.DRAFT_BOARD.PERFECT_BONUS : ECONOMY.DRAFT_BOARD.PARTICIPATION);
+  } else {
+    coinsEarned =
+      score * ECONOMY.SPORTS_GRID.COINS_PER_CORRECT_CELL +
+      (isPerfect ? ECONOMY.SPORTS_GRID.PERFECT_BONUS : ECONOMY.SPORTS_GRID.PARTICIPATION);
+  }
 
   const { data: userData } = await supabase
     .from("users")

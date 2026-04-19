@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-type Game = "both" | "grid" | "trivia";
+type Game = "both" | "grid" | "trivia" | "draft";
 
 interface HowToPlayModalProps {
   game: Game;
@@ -78,6 +78,51 @@ function GridSection() {
         <li className="flex items-start gap-2">
           <span className="mt-0.5 text-zinc-400">→</span>
           <span>New grid every day 🗓️</span>
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+function DraftBoardSection() {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <span className="text-xl">🃏</span>
+        <h3 className="text-lg font-extrabold text-white">Draft Board</h3>
+      </div>
+      {/* Mini card tray illustration */}
+      <div className="flex gap-2 justify-center mb-5">
+        {["Kobe", "Messi", "LeBron"].map((name, i) => (
+          <div
+            key={i}
+            className={[
+              "rounded-lg border-2 px-2 py-2 text-xs font-bold text-center w-20",
+              i === 1
+                ? "border-purple-400 bg-purple-400/20 text-purple-200"
+                : "border-zinc-600 bg-zinc-800 text-zinc-400",
+            ].join(" ")}
+          >
+            {name}
+          </div>
+        ))}
+      </div>
+      <ul className="space-y-2 text-sm text-zinc-300">
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 text-purple-400">→</span>
+          <span>You get <span className="font-semibold text-white">12 player cards</span> — 9 correct answers and 3 decoys</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 text-yellow-400">→</span>
+          <span>Select a card, then tap the cell it belongs in</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 text-red-400">→</span>
+          <span className="font-semibold text-white">5 wrong placements and you&apos;re done 💀</span>
+        </li>
+        <li className="flex items-start gap-2">
+          <span className="mt-0.5 text-zinc-400">→</span>
+          <span>One draft per sport per day 🗓️</span>
         </li>
       </ul>
     </div>
@@ -185,6 +230,7 @@ function ModalContent({ game, onClose }: HowToPlayModalProps) {
           <div className="px-6 py-5 overflow-y-auto" style={{ maxHeight: "65vh" }}>
             {game === "grid"   && <GridSection />}
             {game === "trivia" && <TriviaSection />}
+            {game === "draft"  && <DraftBoardSection />}
           </div>
         )}
 

@@ -5,7 +5,8 @@
  * Storage key: "ballbrain_gp_v1"
  * Structure:
  * {
- *   "grid":   { "NBA": { "date": "2026-04-03", "count": 1 }, "Soccer": { ... } },
+ *   "grid":  { "NBA": { "date": "2026-04-03", "count": 1 }, "Soccer": { ... } },
+ *   "draft": { "NBA": { "date": "2026-04-03", "count": 1 }, "Soccer": { ... } },
  *   "trivia": { "NBA": { "date": "2026-04-03", "count": 1 }, "Soccer": { ... }, "Mix": { ... } }
  * }
  */
@@ -16,6 +17,7 @@ const KEY = "ballbrain_gp_v1";
 type SportEntry = { date: string; count: number };
 type GuestPlays = {
   grid: Record<string, SportEntry>;
+  draft: Record<string, SportEntry>;
   trivia: Record<string, SportEntry>;
 };
 
@@ -37,18 +39,19 @@ function isValidEntry(v: unknown): v is SportEntry {
 function load(): GuestPlays {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { grid: {}, trivia: {} };
+    if (!raw) return { grid: {}, draft: {}, trivia: {} };
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return { grid: {}, trivia: {} };
+      return { grid: {}, draft: {}, trivia: {} };
     }
     const p = parsed as Record<string, unknown>;
     return {
       grid:   typeof p.grid   === "object" && p.grid   !== null ? (p.grid   as Record<string, unknown>) as Record<string, SportEntry> : {},
+      draft:  typeof p.draft  === "object" && p.draft  !== null ? (p.draft  as Record<string, unknown>) as Record<string, SportEntry> : {},
       trivia: typeof p.trivia === "object" && p.trivia !== null ? (p.trivia as Record<string, unknown>) as Record<string, SportEntry> : {},
     };
   } catch {
-    return { grid: {}, trivia: {} };
+    return { grid: {}, draft: {}, trivia: {} };
   }
 }
 
@@ -61,7 +64,7 @@ function save(data: GuestPlays): void {
 }
 
 /** Returns today's play count for a game + sport. Returns 0 if no valid entry exists or date has changed. */
-export function getGuestCount(game: "grid" | "trivia", sport: string): number {
+export function getGuestCount(game: "grid" | "draft" | "trivia", sport: string): number {
   const data = load();
   const entry = data[game]?.[sport];
   if (!isValidEntry(entry)) return 0;
@@ -70,7 +73,7 @@ export function getGuestCount(game: "grid" | "trivia", sport: string): number {
 }
 
 /** Increments today's play count and returns the new total. */
-export function incrementGuestCount(game: "grid" | "trivia", sport: string): number {
+export function incrementGuestCount(game: "grid" | "draft" | "trivia", sport: string): number {
   const data = load();
   const t = today();
   if (!data[game]) data[game] = {};

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import HowToPlayModal from "@/components/ui/HowToPlayModal";
 
-type ModalGame = "grid" | "trivia";
+type ModalGame = "grid" | "trivia" | "draft";
 
 function GridIcon() {
   return (
@@ -18,6 +18,17 @@ function GridIcon() {
       <rect x="2"  y="28" width="10" height="10" rx="2" fill="currentColor" opacity="0.6" />
       <rect x="15" y="28" width="10" height="10" rx="2" fill="currentColor" opacity="0.6" />
       <rect x="28" y="28" width="10" height="10" rx="2" fill="currentColor" opacity="0.9" />
+    </svg>
+  );
+}
+
+function DraftIcon() {
+  return (
+    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+      {/* Three stacked cards */}
+      <rect x="6"  y="14" width="22" height="16" rx="3" fill="currentColor" opacity="0.25" />
+      <rect x="10" y="10" width="22" height="16" rx="3" fill="currentColor" opacity="0.5" />
+      <rect x="14" y="6"  width="22" height="16" rx="3" fill="currentColor" opacity="0.9" />
     </svg>
   );
 }
@@ -58,6 +69,19 @@ const GAMES = [
     sports: ["NBA", "Soccer"],
     ctaClass: "bg-indigo-500 hover:bg-indigo-400 text-white",
   },
+  {
+    id: "draft" as ModalGame,
+    href: "/draft-board",
+    icon: <DraftIcon />,
+    iconColor: "text-purple-400",
+    accentBorder: "hover:border-purple-500/50",
+    badge: "Daily",
+    badgeColor: "bg-purple-500/10 text-purple-400 border-purple-500/30",
+    name: "Draft Board",
+    description: "12 players. 9 spots. Pick the right one.",
+    sports: ["NBA", "Soccer"],
+    ctaClass: "bg-purple-500 hover:bg-purple-400 text-white",
+  },
 ] as const;
 
 export default function HomeGameCards() {
@@ -65,7 +89,7 @@ export default function HomeGameCards() {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-2xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full max-w-4xl">
         {GAMES.map((game) => (
           <div
             key={game.href}
