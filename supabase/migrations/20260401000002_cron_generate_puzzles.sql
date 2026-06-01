@@ -5,10 +5,6 @@
 --   1. Enable pg_cron
 --   2. Enable pg_net
 --
--- After running this migration, update the two placeholders:
---   YOUR_PROJECT_REF  → your Supabase project reference ID
---   YOUR_CRON_SECRET  → same value as the CRON_SECRET env var on the Edge Function
---
 -- To update an existing job after changing the URL/secret, run:
 --   SELECT cron.unschedule('generate-daily-puzzles');
 --   then re-run this file.
@@ -31,8 +27,8 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-      url     := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/generate-daily-puzzles',
-      headers := '{"Content-Type":"application/json","x-cron-secret":"YOUR_CRON_SECRET"}'::jsonb,
+      url     := 'https://wdkzsnkrdqadoiqbjlqr.supabase.co/functions/v1/generate-daily-puzzles',
+      headers := '{"Content-Type":"application/json","x-cron-secret":"ballbrain_cron_2026"}'::jsonb,
       body    := '{}'::jsonb
     ) AS request_id;
   $$

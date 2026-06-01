@@ -151,3 +151,25 @@ SUPABASE_SERVICE_ROLE_KEY=       # Server-only: never expose to client
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` is server-only. Never reference it in any file that has or could be imported by a `"use client"` component.
+
+## Deployment Gotchas
+
+### Edge Functions — always use `--no-verify-jwt`
+
+**Always** deploy edge functions with the explicit flag:
+
+```
+npx supabase functions deploy generate-daily-puzzles --no-verify-jwt
+npx supabase functions deploy daily-health-check --no-verify-jwt
+```
+
+A plain `npx supabase functions deploy <name>` re-enables Supabase's JWT verification gate in the cloud, **even though `config.toml` says `verify_jwt = false`**. The result is a `401 UNAUTHORIZED_NO_AUTH_HEADER` on every request — the cron and manual admin route both break silently before the function code is ever reached.
+
+These functions authenticate via the `x-cron-secret` header (not JWT), so JWT verification must stay off.
+
+### Cron secret and project ref
+
+- **Project ref**: `wdkzsnkrdqadoiqbjlqr`
+- **Cron secret** (`CRON_SECRET` edge function secret + `x-cron-secret` header value): `ballbrain_cron_2026`
+
+The cron secret must match in two places: the edge function secret set in the Supabase dashboard, and the `headers` value in the pg_cron SQL (`supabase/migrations/20260401000002_cron_generate_puzzles.sql`). If you ever rotate the secret, update both.
