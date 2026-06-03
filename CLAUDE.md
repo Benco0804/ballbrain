@@ -141,6 +141,10 @@ export const ECONOMY = {
 } as const;
 ```
 
+## Future Improvements
+
+- **Trivia true-accuracy not yet computable** — would need a `questions_correct` column on `solo_trivia_plays` and recording it in the TriviaGame component. Currently using `questions_answered` as "Avg Progress" instead (how far you typically get, not exact accuracy — due to the 2-strike system where you advance past a wrong answer on strike 1, so `questions_answered` includes questions you got wrong).
+
 ## Environment Variables
 
 ```
