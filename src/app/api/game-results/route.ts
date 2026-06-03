@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ECONOMY } from "@/lib/economy/constants";
+import { awardCoins } from "@/lib/economy/coins";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -42,6 +43,8 @@ export async function POST(request: NextRequest) {
     .eq("session_id", sessionId)
     .maybeSingle();
 
+  let gameResultId: string | null = existing?.id ?? null;
+
   if (existing) {
     // Session row exists — only update if this is the first completion.
     if (completed && !existing.completed_at) {
@@ -53,22 +56,27 @@ export async function POST(request: NextRequest) {
     }
   } else {
     // New session — insert stub or complete row.
-    const { error } = await supabase.from("game_results").insert({
-      session_id: sessionId,
-      user_id: user.id,
-      puzzle_id: puzzleId,
-      sport,
-      play_date: today,
-      score,
-      guesses_used: guessesUsed,
-      cells_filled: cellsFilled,
-      completed_at: completed ? new Date().toISOString() : null,
-    });
+    const { data: insertedRow, error } = await supabase
+      .from("game_results")
+      .insert({
+        session_id: sessionId,
+        user_id: user.id,
+        puzzle_id: puzzleId,
+        sport,
+        play_date: today,
+        score,
+        guesses_used: guessesUsed,
+        cells_filled: cellsFilled,
+        completed_at: completed ? new Date().toISOString() : null,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       console.error("[game-results] insert error:", error.message, error.code);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+    gameResultId = insertedRow?.id ?? null;
     console.log("[game-results] inserted new session row completed=%s", completed);
   }
 
@@ -106,16 +114,13 @@ export async function POST(request: NextRequest) {
       (isPerfect ? ECONOMY.SPORTS_GRID.PERFECT_BONUS : ECONOMY.SPORTS_GRID.PARTICIPATION);
   }
 
-  const { data: userData } = await supabase
-    .from("users")
-    .select("coins")
-    .eq("id", user.id)
-    .single();
-
-  await supabase
-    .from("users")
-    .update({ coins: (userData?.coins ?? 0) + coinsEarned })
-    .eq("id", user.id);
+  await awardCoins(supabase, {
+    userId: user.id,
+    amount: coinsEarned,
+    reason: resolvedGameMode === "draft-board" ? "draft_completion" : "grid_completion",
+    referenceId: gameResultId,
+    referenceType: "game_result",
+  });
 
   return NextResponse.json({ saved: true, coinsEarned });
 }

@@ -81,7 +81,7 @@ src/proxy.ts                  # Next.js Proxy (auth session refresh — middlewa
 ## Economy Specs
 
 ### Starting Balance
-- New users receive **100 coins** on account creation.
+- New users receive **150 coins** on account creation.
 
 ### Sports Grid Earnings
 | Outcome | Coins |
@@ -118,7 +118,7 @@ All values above live in `src/lib/economy/constants.ts`. Example shape:
 
 ```ts
 export const ECONOMY = {
-  STARTING_COINS: 100,
+  STARTING_COINS: 150,
   SPORTS_GRID: {
     COINS_PER_CORRECT_CELL: 10,
     PERFECT_BONUS: 60,
@@ -173,3 +173,9 @@ These functions authenticate via the `x-cron-secret` header (not JWT), so JWT ve
 - **Cron secret** (`CRON_SECRET` edge function secret + `x-cron-secret` header value): `ballbrain_cron_2026`
 
 The cron secret must match in two places: the edge function secret set in the Supabase dashboard, and the `headers` value in the pg_cron SQL (`supabase/migrations/20260401000002_cron_generate_puzzles.sql`). If you ever rotate the secret, update both.
+
+**All migration/cron SQL must use the real project ref (`wdkzsnkrdqadoiqbjlqr`) and real secrets — NEVER placeholder values like `YOUR_PROJECT_REF`. Unsubstituted placeholders silently broke the puzzle cron for weeks.**
+
+### Migration workflow
+
+Claude Code writes migration SQL files but cannot apply them. Ben runs all migration SQL manually in the Supabase SQL Editor. Always provide migration SQL as a copy-ready block.

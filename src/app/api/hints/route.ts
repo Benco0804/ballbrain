@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ECONOMY } from "@/lib/economy/constants";
+import { awardCoins } from "@/lib/economy/coins";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -74,12 +75,17 @@ export async function POST(request: NextRequest) {
   }
 
   // Deduct coins then record hint (order matters: charge before granting).
-  const { error: coinError } = await supabase
-    .from("users")
-    .update({ coins: currentCoins - ECONOMY.SPORTS_GRID.HINT_COST })
-    .eq("id", user.id);
-
-  if (coinError) return NextResponse.json({ error: coinError.message }, { status: 500 });
+  try {
+    await awardCoins(supabase, {
+      userId: user.id,
+      amount: -ECONOMY.SPORTS_GRID.HINT_COST,
+      reason: "hint_purchase",
+      referenceType: "purchase",
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "coin_deduction_failed";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 
   await supabase.from("puzzle_hints").insert({
     user_id: user.id,
