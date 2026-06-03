@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { awardCoins } from "@/lib/economy/coins";
+import { updateStreak } from "@/lib/game/streak";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -48,15 +49,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: insertError.message }, { status: 500 });
   }
 
-  // Only award coins if this was a new play record.
-  if (!insertError && coinsEarned > 0) {
-    await awardCoins(supabase, {
-      userId: user.id,
-      amount: coinsEarned,
-      reason: "trivia_completion",
-      referenceId: insertedPlay?.id ?? null,
-      referenceType: "solo_trivia",
-    });
+  // Award coins and advance streak on any new play record.
+  if (!insertError) {
+    if (coinsEarned > 0) {
+      await awardCoins(supabase, {
+        userId: user.id,
+        amount: coinsEarned,
+        reason: "trivia_completion",
+        referenceId: insertedPlay?.id ?? null,
+        referenceType: "solo_trivia",
+      });
+    }
+    await updateStreak(supabase, user.id);
   }
 
   return NextResponse.json({ saved: !insertError, coinsEarned: insertError ? 0 : coinsEarned });

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { ECONOMY } from "@/lib/economy/constants";
 import { awardCoins } from "@/lib/economy/coins";
+import { updateStreak } from "@/lib/game/streak";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -121,6 +122,8 @@ export async function POST(request: NextRequest) {
     referenceId: gameResultId,
     referenceType: "game_result",
   });
+
+  await updateStreak(supabase, user.id);
 
   return NextResponse.json({ saved: true, coinsEarned });
 }

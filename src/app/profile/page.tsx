@@ -8,28 +8,6 @@ export const metadata: Metadata = {
   title: "Profile — BallBrain",
 };
 
-function calculateStreak(isoDateStrings: string[]): number {
-  if (isoDateStrings.length === 0) return 0;
-
-  const unique = [...new Set(isoDateStrings)].sort((a, b) => b.localeCompare(a));
-
-  // Streak is only "active" if the most recent activity was today or yesterday.
-  const yesterdayStr = new Date(Date.now() - 86400000).toISOString().split("T")[0];
-  if (unique[0] < yesterdayStr) return 0;
-
-  let streak = 1;
-  for (let i = 1; i < unique.length; i++) {
-    const d1 = new Date(unique[i - 1] + "T00:00:00Z").getTime();
-    const d2 = new Date(unique[i] + "T00:00:00Z").getTime();
-    if (Math.round((d1 - d2) / 86400000) === 1) {
-      streak++;
-    } else {
-      break;
-    }
-  }
-
-  return streak;
-}
 
 function formatDate(dateStr: string): string {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
@@ -51,21 +29,21 @@ export default async function ProfilePage() {
   ] = await Promise.all([
     supabase
       .from("users")
-      .select("username, display_name, coins, avatar_url, created_at")
+      .select("username, display_name, coins, avatar_url, created_at, current_streak, longest_streak")
       .eq("id", user.id)
       .single(),
 
-    // Only count completed grid games for stats and streak.
+    // Only count completed grid games for stats.
     supabase
       .from("game_results")
-      .select("score, completed_at")
+      .select("score")
       .eq("user_id", user.id)
       .not("completed_at", "is", null),
 
-    // Only count completed trivia sessions for stats and streak.
+    // Only count completed trivia sessions for stats.
     supabase
       .from("solo_trivia_plays")
-      .select("questions_answered, play_date")
+      .select("questions_answered")
       .eq("user_id", user.id)
       .not("completed_at", "is", null),
   ]);
@@ -82,10 +60,7 @@ export default async function ProfilePage() {
   const triviaWins    = triviaPlays?.filter((p) => p.questions_answered === 10).length ?? 0;
   const triviaWinRate = triviaTotal > 0 ? Math.round((triviaWins / triviaTotal) * 100) : null;
 
-  // Streak: only days with a completed game (use completed_at date for grid, play_date for trivia)
-  const gridDates   = (gridResults ?? []).map((r) => (r.completed_at as string).split("T")[0]);
-  const triviaDates = (triviaPlays  ?? []).map((p) => p.play_date as string);
-  const streak = calculateStreak([...gridDates, ...triviaDates]);
+  const streak = profile?.current_streak ?? 0;
 
   return (
     <main className="min-h-screen bg-zinc-950 text-white flex flex-col items-center px-4 py-10">
