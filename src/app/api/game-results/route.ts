@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { ECONOMY } from "@/lib/economy/constants";
+import { ECONOMY, XP } from "@/lib/economy/constants";
 import { awardCoins } from "@/lib/economy/coins";
+import { awardXp } from "@/lib/economy/xp";
 import { updateStreak } from "@/lib/game/streak";
 
 export async function POST(request: NextRequest) {
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     if (completed && !existing.completed_at) {
       await supabase
         .from("game_results")
-        .update({ score, guesses_used: guessesUsed, cells_filled: cellsFilled, completed_at: new Date().toISOString() })
+        .update({ score, guesses_used: guessesUsed, cells_filled: cellsFilled, completed_at: new Date().toISOString(), game_mode: resolvedGameMode })
         .eq("id", existing.id);
       console.log("[game-results] updated session to completed");
     }
@@ -69,6 +70,7 @@ export async function POST(request: NextRequest) {
         guesses_used: guessesUsed,
         cells_filled: cellsFilled,
         completed_at: completed ? new Date().toISOString() : null,
+        game_mode: resolvedGameMode,
       })
       .select("id")
       .single();
@@ -122,6 +124,21 @@ export async function POST(request: NextRequest) {
     referenceId: gameResultId,
     referenceType: "game_result",
   });
+
+  let xpEarned: number;
+  if (resolvedGameMode === "draft-board") {
+    const isFlawless = guessesUsed === score;
+    xpEarned =
+      XP.DRAFT_BOARD.BASE +
+      score * XP.DRAFT_BOARD.PER_CORRECT_CELL +
+      (isFlawless ? XP.DRAFT_BOARD.FLAWLESS_BONUS : 0);
+  } else {
+    xpEarned =
+      XP.SPORTS_GRID.BASE +
+      score * XP.SPORTS_GRID.PER_CORRECT_CELL +
+      (isPerfect ? XP.SPORTS_GRID.PERFECT_BONUS : 0);
+  }
+  await awardXp(supabase, user.id, xpEarned);
 
   await updateStreak(supabase, user.id);
 

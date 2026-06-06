@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import AvatarUpload from "@/components/profile/AvatarUpload";
 import UsernameEdit from "@/components/profile/UsernameEdit";
 import SportProfileView, { type SportStats } from "@/components/profile/SportProfileView";
+import RankBanner from "@/components/profile/RankBanner";
 import { ECONOMY } from "@/lib/economy/constants";
 
 export const metadata: Metadata = {
@@ -97,7 +98,7 @@ export default async function ProfilePage() {
   const [{ data: profile }, { data: gridResults }, { data: triviaPlays }] = await Promise.all([
     supabase
       .from("users")
-      .select("username, display_name, coins, avatar_url, created_at, current_streak, longest_streak")
+      .select("username, display_name, coins, avatar_url, created_at, current_streak, longest_streak, xp")
       .eq("id", user.id)
       .single(),
 
@@ -147,6 +148,9 @@ export default async function ProfilePage() {
             </div>
           </div>
         </div>
+
+        {/* Rank banner — global XP progression crown */}
+        <RankBanner xp={profile?.xp ?? 0} />
 
         {/* Global stats (cross-sport) */}
         <div className="grid grid-cols-3 gap-3">

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { ECONOMY, XP } from "@/lib/economy/constants";
 import { awardCoins } from "@/lib/economy/coins";
+import { awardXp } from "@/lib/economy/xp";
 import { updateStreak } from "@/lib/game/streak";
 
 export async function POST(request: NextRequest) {
@@ -60,6 +62,13 @@ export async function POST(request: NextRequest) {
         referenceType: "solo_trivia",
       });
     }
+
+    const xpEarned =
+      XP.SOLO_TRIVIA.BASE +
+      questionsAnswered * XP.SOLO_TRIVIA.PER_QUESTION_ANSWERED +
+      (questionsAnswered === ECONOMY.SOLO_TRIVIA.TOTAL_QUESTIONS ? XP.SOLO_TRIVIA.FULL_CLEAR_BONUS : 0);
+    await awardXp(supabase, user.id, xpEarned);
+
     await updateStreak(supabase, user.id);
   }
 

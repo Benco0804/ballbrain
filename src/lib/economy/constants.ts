@@ -32,3 +32,29 @@ export const ECONOMY = {
     } as Record<number, number>,
   },
 } as const;
+
+export const XP = {
+  SPORTS_GRID: {
+    BASE: 25,
+    PER_CORRECT_CELL: 5,
+    PERFECT_BONUS: 30,
+  },
+  DRAFT_BOARD: {
+    BASE: 25,
+    PER_CORRECT_CELL: 5,
+    FLAWLESS_BONUS: 30,
+  },
+  SOLO_TRIVIA: {
+    BASE: 20,
+    PER_QUESTION_ANSWERED: 4,
+    FULL_CLEAR_BONUS: 40,
+  },
+  RANKS: [
+    { name: "Rookie",       levels: 10, xp_per_level: 100  },
+    { name: "Starter",      levels: 10, xp_per_level: 200  },
+    { name: "All-Star",     levels: 10, xp_per_level: 350  },
+    { name: "Elite",        levels: 10, xp_per_level: 550  },
+    { name: "MVP",          levels: 10, xp_per_level: 800  },
+    { name: "Hall of Fame", levels: 10, xp_per_level: 1200 },
+  ],
+} as const;
