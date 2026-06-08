@@ -4,6 +4,8 @@ import React, { useState, useRef, useEffect } from "react";
 import { ECONOMY } from "@/lib/economy/constants";
 import { getGuestCount, incrementGuestCount } from "@/lib/game/guestPlays";
 import DraftResultModal from "./DraftResultModal";
+import BadgeCelebrationModal from "@/components/game/BadgeCelebrationModal";
+import type { BadgeDefinition } from "@/lib/badges/constants";
 
 interface GridCategory {
   label: string;
@@ -61,6 +63,7 @@ export default function DraftBoard({
   const [coinsEarned, setCoinsEarned] = useState(0);
   const [uniquenessBonus, setUniquenessBonus] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [newBadges, setNewBadges] = useState<BadgeDefinition[]>([]);
   // Drag-and-drop state (desktop only — HTML5 drag API does not fire on touch).
   const [draggingCard, setDraggingCard] = useState<string | null>(null);
   const [dragOverCell, setDragOverCell] = useState<string | null>(null);
@@ -135,7 +138,7 @@ export default function DraftBoard({
     }
 
     try {
-      await fetch("/api/game-results", {
+      const res = await fetch("/api/game-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -149,6 +152,10 @@ export default function DraftBoard({
           completed: true,
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (Array.isArray(data.newBadges) && data.newBadges.length > 0) {
+        setNewBadges(data.newBadges);
+      }
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
     } catch {
       // Silent fail — non-critical
@@ -439,6 +446,14 @@ export default function DraftBoard({
           draftPlayers={draftPlayers}
           rowCategories={rowCategories}
           colCategories={colCategories}
+        />
+      )}
+
+      {/* Badge celebration — floats on top of the result modal until dismissed */}
+      {showModal && (
+        <BadgeCelebrationModal
+          badges={newBadges}
+          onDismiss={() => setNewBadges([])}
         />
       )}
     </div>

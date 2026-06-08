@@ -5,6 +5,7 @@ import AvatarUpload from "@/components/profile/AvatarUpload";
 import UsernameEdit from "@/components/profile/UsernameEdit";
 import SportProfileView, { type SportStats } from "@/components/profile/SportProfileView";
 import RankBanner from "@/components/profile/RankBanner";
+import TrophyCase from "@/components/profile/TrophyCase";
 import { ECONOMY } from "@/lib/economy/constants";
 
 export const metadata: Metadata = {
@@ -95,7 +96,7 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/login");
 
-  const [{ data: profile }, { data: gridResults }, { data: triviaPlays }] = await Promise.all([
+  const [{ data: profile }, { data: gridResults }, { data: triviaPlays }, { data: badgeRows }] = await Promise.all([
     supabase
       .from("users")
       .select("username, display_name, coins, avatar_url, created_at, current_streak, longest_streak, xp")
@@ -113,7 +114,19 @@ export default async function ProfilePage() {
       .select("questions_answered, sport")
       .eq("user_id", user.id)
       .not("completed_at", "is", null),
+
+    supabase
+      .from("user_badges")
+      .select("badge_id, earned_at")
+      .eq("user_id", user.id),
   ]);
+
+  const earnedBadgeIds = new Set((badgeRows ?? []).map((r: { badge_id: string }) => r.badge_id));
+  const earnedAt: Record<string, string> = {};
+  for (const r of badgeRows ?? []) {
+    earnedAt[(r as { badge_id: string; earned_at: string }).badge_id] =
+      (r as { badge_id: string; earned_at: string }).earned_at;
+  }
 
   const username    = profile?.username ?? "Player";
   const displayName = profile?.display_name || username;
@@ -173,6 +186,9 @@ export default async function ProfilePage() {
 
         {/* Per-sport stats */}
         <SportProfileView sportStats={sportStats} />
+
+        {/* Trophy case */}
+        <TrophyCase earnedBadgeIds={earnedBadgeIds} earnedAt={earnedAt} />
 
       </div>
     </main>

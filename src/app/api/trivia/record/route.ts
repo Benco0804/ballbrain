@@ -4,6 +4,8 @@ import { ECONOMY, XP } from "@/lib/economy/constants";
 import { awardCoins } from "@/lib/economy/coins";
 import { awardXp } from "@/lib/economy/xp";
 import { updateStreak } from "@/lib/game/streak";
+import { checkAndAwardBadges } from "@/lib/badges/checker";
+import type { BadgeDefinition } from "@/lib/badges/constants";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -67,10 +69,19 @@ export async function POST(request: NextRequest) {
       XP.SOLO_TRIVIA.BASE +
       questionsAnswered * XP.SOLO_TRIVIA.PER_QUESTION_ANSWERED +
       (questionsAnswered === ECONOMY.SOLO_TRIVIA.TOTAL_QUESTIONS ? XP.SOLO_TRIVIA.FULL_CLEAR_BONUS : 0);
-    await awardXp(supabase, user.id, xpEarned);
+    const newTotalXp = await awardXp(supabase, user.id, xpEarned);
 
     await updateStreak(supabase, user.id);
+
+    let newBadges: BadgeDefinition[] = [];
+    try {
+      newBadges = await checkAndAwardBadges(supabase, { userId: user.id, newTotalXp });
+    } catch {
+      // Badge check is non-critical — game completion succeeds regardless
+    }
+
+    return NextResponse.json({ saved: true, coinsEarned, newBadges });
   }
 
-  return NextResponse.json({ saved: !insertError, coinsEarned: insertError ? 0 : coinsEarned });
+  return NextResponse.json({ saved: false, coinsEarned: 0, newBadges: [] });
 }

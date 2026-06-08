@@ -157,6 +157,7 @@ A future shared "hearts" pool (~5/day across all modes, with ad/coin/faucet refi
 - Hearts/energy system.
 - IAP activation; subscription.
 - 1v1 Trivia Battle.
+- **Prestige perfection badge tier** — a future "flawless" prestige layer on top of the Phase 3 perfection badges. Defined as: perfect score AND zero wrong guesses (`guesses_used = score`) AND no hints used. Would introduce NEW higher-tier badges (e.g. "True Savant") rather than redefining existing ones, so existing badge holders keep what they earned. Data to support this already exists (`guesses_used` column on `game_results`, `puzzle_hints` table). Deferred to keep Phase 3 focused.
 
 ---
 

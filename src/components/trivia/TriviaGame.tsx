@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { ECONOMY } from "@/lib/economy/constants";
 import { createClient } from "@/lib/supabase/client";
 import { getGuestCount, incrementGuestCount } from "@/lib/game/guestPlays";
+import BadgeCelebrationModal from "@/components/game/BadgeCelebrationModal";
+import type { BadgeDefinition } from "@/lib/badges/constants";
 
 const MILESTONES = ECONOMY.SOLO_TRIVIA.MILESTONES as Record<number, number>;
 const MILESTONE_QS = new Set(Object.keys(MILESTONES).map(Number));
@@ -97,6 +99,7 @@ export default function TriviaGame({ isAuthenticated, playCountsBySport }: Trivi
   const [won, setWon] = useState(false);
   const [cashedOut, setCashedOut] = useState(false);
   const [milestonePopupTimeLeft, setMilestonePopupTimeLeft] = useState(MILESTONE_POPUP_SECS);
+  const [newBadges, setNewBadges] = useState<BadgeDefinition[]>([]);
 
   const revealTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Always-fresh ref to handleAnswer — prevents stale closure in timer effect.
@@ -257,7 +260,7 @@ export default function TriviaGame({ isAuthenticated, playCountsBySport }: Trivi
       return;
     }
     try {
-      await fetch("/api/trivia/record", {
+      const res = await fetch("/api/trivia/record", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -267,6 +270,10 @@ export default function TriviaGame({ isAuthenticated, playCountsBySport }: Trivi
           variant: currentVariantRef.current,
         }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (Array.isArray(data.newBadges) && data.newBadges.length > 0) {
+        setNewBadges(data.newBadges);
+      }
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
     } catch {
       // Silent fail — non-critical
@@ -502,6 +509,7 @@ export default function TriviaGame({ isAuthenticated, playCountsBySport }: Trivi
         : `You reached Q${questionNumber} of ${TOTAL_QS}`;
 
     return (
+      <>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
         <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 shadow-2xl overflow-hidden">
           <div className={`px-6 py-5 text-center border-b ${(won || cashedOut) ? "bg-green-500/10 border-green-500/20" : "bg-zinc-800 border-zinc-700"}`}>
@@ -551,6 +559,10 @@ export default function TriviaGame({ isAuthenticated, playCountsBySport }: Trivi
           </div>
         </div>
       </div>
+
+      {/* Badge celebration — floats on top of done screen until dismissed */}
+      <BadgeCelebrationModal badges={newBadges} onDismiss={() => setNewBadges([])} />
+      </>
     );
   }
 

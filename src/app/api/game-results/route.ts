@@ -4,6 +4,8 @@ import { ECONOMY, XP } from "@/lib/economy/constants";
 import { awardCoins } from "@/lib/economy/coins";
 import { awardXp } from "@/lib/economy/xp";
 import { updateStreak } from "@/lib/game/streak";
+import { checkAndAwardBadges } from "@/lib/badges/checker";
+import type { BadgeDefinition } from "@/lib/badges/constants";
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
@@ -138,9 +140,16 @@ export async function POST(request: NextRequest) {
       score * XP.SPORTS_GRID.PER_CORRECT_CELL +
       (isPerfect ? XP.SPORTS_GRID.PERFECT_BONUS : 0);
   }
-  await awardXp(supabase, user.id, xpEarned);
+  const newTotalXp = await awardXp(supabase, user.id, xpEarned);
 
   await updateStreak(supabase, user.id);
 
-  return NextResponse.json({ saved: true, coinsEarned });
+  let newBadges: BadgeDefinition[] = [];
+  try {
+    newBadges = await checkAndAwardBadges(supabase, { userId: user.id, newTotalXp });
+  } catch {
+    // Badge check is non-critical — game completion succeeds regardless
+  }
+
+  return NextResponse.json({ saved: true, coinsEarned, newBadges });
 }

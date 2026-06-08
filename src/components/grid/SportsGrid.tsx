@@ -7,6 +7,8 @@ import { normalize } from "@/lib/sports/normalize";
 import { ECONOMY } from "@/lib/economy/constants";
 import { getGuestCount, incrementGuestCount } from "@/lib/game/guestPlays";
 import ResultModal from "./ResultModal";
+import BadgeCelebrationModal from "@/components/game/BadgeCelebrationModal";
+import type { BadgeDefinition } from "@/lib/badges/constants";
 
 interface GridCategory {
   label: string;
@@ -64,6 +66,7 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
   const [gameOver, setGameOver] = useState(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [newBadges, setNewBadges] = useState<BadgeDefinition[]>([]);
   const [hintsUsedCount, setHintsUsedCount] = useState(0);
   const [hintLoading, setHintLoading] = useState(false);
   const [hintError, setHintError] = useState<string | null>(null);
@@ -198,11 +201,15 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
     }
 
     try {
-      await fetch("/api/game-results", {
+      const res = await fetch("/api/game-results", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: sessionIdRef.current, puzzleId, sport, score, guessesUsed: totalGuesses, cellsFilled, completed: true }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (Array.isArray(data.newBadges) && data.newBadges.length > 0) {
+        setNewBadges(data.newBadges);
+      }
       // Notify the navbar to refresh the coin balance.
       window.dispatchEvent(new CustomEvent("ballbrain:coins-updated"));
     } catch {
@@ -677,6 +684,14 @@ export default function SportsGrid({ puzzleId, sport, rowCategories, colCategori
           rowCategories={rowCategories}
           colCategories={colCategories}
           nextPuzzleUrl={nextPuzzleUrl}
+        />
+      )}
+
+      {/* Badge celebration — floats on top of the result modal until dismissed */}
+      {showModal && (
+        <BadgeCelebrationModal
+          badges={newBadges}
+          onDismiss={() => setNewBadges([])}
         />
       )}
     </div>
