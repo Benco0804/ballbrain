@@ -1,6 +1,6 @@
 # BallBrain — Product Requirements Document (PRD)
 
-*Last updated: June 6, 2026 — after Phase 2 (XP/Rank system)*
+*Last updated: June 8, 2026 — after Phase 3 (Badge/Trophy Case system)*
 *Maintained as a living document — updated at the end of each build phase.*
 
 ---
@@ -87,8 +87,10 @@ A single proud hero stat per sport, COD-K/D style. **Cell Accuracy = correct cel
 - Stored on the user (`current_streak`, `longest_streak`, `last_active_date`), written at play-time, UTC-based (consistent with puzzles), idempotent (multiple games/day = no double-count).
 - *Streak freeze* mechanic deferred to Phase 4 (column added then, not now).
 
-### Badges *(Phase 3, not yet built)*
-WSOP rings/bracelets model — discrete, memorable, collected trophies displayed on the profile (the "trophy case"). **This is where per-sport identity lives** ("NBA Sharpshooter," "Soccer Perfectionist"). Two types planned: discrete *achievement* badges (specific feats) and possibly a *"Perfect Week"*-style hard-won streak-as-badge (the mastery version of a streak, without risking the core habit streak).
+### Badges *(Phase 3 — shipped)*
+WSOP rings/bracelets model — discrete, memorable, collected trophies displayed on the profile (the "trophy case"). **This is where per-sport identity lives** ("NBA Sharpshooter," "Soccer Perfectionist"). 18 badges across 6 categories: milestone, streak, perfection, mastery (per-sport cell accuracy, min 10 games), volume, and rank. Stored in `user_badges` table; awarded server-side via `grant_badges()` SECURITY DEFINER function (pattern consistent with `award_coins`/`award_xp`). Newly-earned badges return from both game-completion API routes and trigger an instant celebration popup on top of the result screen. Profile shows all 18 in a trophy case — earned in full color with date, locked ones greyed with padlock so players see what to chase. Backfill migration credited existing players retroactively without triggering popups.
+- *Polish remaining:* real badge art (placeholder emoji icons for now). Possible celebration popup animation tweaks.
+- *Possible future addition:* a *"Perfect Week"*-style streak-as-badge (the mastery version of a streak, without risking the core habit streak).
 
 ---
 
@@ -143,9 +145,9 @@ A future shared "hearts" pool (~5/day across all modes, with ad/coin/faucet refi
 - **Phase 0** — coin transaction ledger (`award_coins`, logs to `economy_transactions`) + persisted streak.
 - **Phase 1** — per-sport accuracy profile (sport-agnostic).
 - **Phase 2** — XP/rank/level system (`award_xp`, RankBanner, backfilled).
+- **Phase 3** — Badge/trophy case system (18 badges, `user_badges` table, `grant_badges()` function, celebration popup, profile trophy case, retroactive backfill). Polish remaining: real badge art, possible popup tweaks.
 
 **Next:**
-- **Phase 3** — Badges (WSOP trophy case; per-sport identity lives here).
 - **Phase 4** — Daily faucet (escalating login reward: coins + hints + occasional freeze) + streak-freeze mechanic.
 - **Redesign** — look & feel; FTUE unlock ladder; draft-board-as-signature framing; level-up/rank-up celebrations; rank-driven grid difficulty.
 - **World Cup theming** — ride the wave.
@@ -179,6 +181,9 @@ Next.js (App Router, TypeScript, Tailwind) · Supabase (DB, auth, Edge Functions
 - **Large SQL seed files** hit the ~32k token output limit — split into chunks (~75 players or ~40 questions). Keep content-generation prompts tightly scoped to avoid token spirals.
 - **Always verify generated trivia for factual accuracy** before uploading — a verification pass once caught 4 wrong questions in a batch of 15.
 - **`game_results`:** `score` = correct cells (0–9); `guesses_used` = total attempts; `game_mode` now stored going forward (historical rows null).
+
+### Known bugs / display issues
+- **BUG — Cell Accuracy can display over 100%** (observed: 450% on a 9/9 first game). Formula is `correct cells ÷ total guesses`; likely `guesses_used` is not capturing total attempts correctly, or the display needs a clamp to 100%. Cosmetic only (display-side); does not affect coin/XP awards. Fix in a future session.
 
 ### Don't-backfill vs backfill decisions
 - Coins: **not** backfilled (reconstructing past transactions is lossy; ledger starts clean).

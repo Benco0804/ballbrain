@@ -1,6 +1,6 @@
 # BallBrain — One-Pager
 
-*Last updated: June 6, 2026 — after Phase 2 (XP/Rank system)*
+*Last updated: June 8, 2026 — after Phase 3 (Badge/Trophy Case system)*
 
 ## What it is
 BallBrain is a **sports-knowledge hub** — a web platform where sports fans test and build their sports IQ across multiple game formats, all feeding one persistent sports identity. Live at `ballbrain-kappa.vercel.app`.
@@ -24,7 +24,7 @@ The core bet: nobody owns *"the place where your sports knowledge lives across f
 - **Per-sport accuracy** — a "K/D"-style hero stat per sport (e.g. "NBA: 83%").
 - **XP → Level → Rank** — one global progression. XP rewards engagement + skill; levels are frequent small wins; ranks (Rookie → Starter → All-Star → Elite → MVP → Hall of Fame) are rare milestones.
 - **Streak** — daily-return habit (counts *playing*, not winning).
-- **Badges** *(coming, Phase 3)* — WSOP-style discrete trophies; this is where per-sport identity lives.
+- **Badges** *(Phase 3 — shipped)* — WSOP-style discrete trophies; this is where per-sport identity lives. 18 badges across 6 categories, stored and earned live, with a celebration popup and profile trophy case. Real art deferred (placeholder icons now).
 
 ## Economy (free-to-play)
 - **Coins** — spendable currency. Earned by playing; sinks are hints (volume engine) and, later, streak-freeze (peak engine) + cosmetics.
@@ -33,10 +33,10 @@ The core bet: nobody owns *"the place where your sports knowledge lives across f
 
 ## Current state (June 2026)
 - Live, alpha launched. Daily puzzle auto-generation working. Content banks healthy and World Cup-weighted.
-- Built: coin ledger, persisted streak, per-sport accuracy profile, XP/rank/level system.
+- Built: coin ledger, persisted streak, per-sport accuracy profile, XP/rank/level system, badge/trophy case system.
 
 ## What's next
-Badges → daily faucet + streak freeze → look-and-feel redesign (incl. FTUE unlock ladder + level-up/rank-up celebrations) → World Cup theming → launch.
+Daily faucet + streak freeze → look-and-feel redesign (incl. FTUE unlock ladder + level-up/rank-up celebrations) → World Cup theming → launch.
 
 ## Tech stack
 Next.js (App Router, TypeScript, Tailwind) · Supabase (DB, auth, Edge Functions, pg_cron) · Vercel. Built solo, primarily via Claude Code.
