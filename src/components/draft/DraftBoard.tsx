@@ -147,7 +147,7 @@ export default function DraftBoard({
           sport,
           gameMode: "draft-board",
           score,
-          guessesUsed: finalWrongAttempts,
+          guessesUsed: score + finalWrongAttempts,
           cellsFilled,
           completed: true,
         }),
